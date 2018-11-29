@@ -85,8 +85,7 @@ rtems_task Init(
   status = rtems_task_start( Task_id[ 3 ], Task_3, 0 );
   directive_failed( status, "rtems_task_start of TASK3" );
 
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
+  rtems_task_exit();
 }
 
 rtems_asr Process_asr_for_pass_1(
@@ -100,7 +99,7 @@ rtems_asr Process_asr_for_pass_1(
     end_time,
     1,
     0,
-    CALLING_OVERHEAD_SIGNAL_SEND
+    0
   );
 
   benchmark_timer_initialize();
@@ -133,7 +132,7 @@ rtems_task Task_1(
     end_time,
     1,
     0,
-    CALLING_OVERHEAD_SIGNAL_CATCH
+    0
   );
 
   benchmark_timer_initialize();
@@ -145,7 +144,7 @@ rtems_task Task_1(
     end_time,
     1,
     0,
-    CALLING_OVERHEAD_SIGNAL_SEND
+    0
   );
 
   benchmark_timer_initialize();

@@ -20,8 +20,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#define RCSID	"$Id$"
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -65,9 +63,6 @@ extern rtems_id rtems_pppd_taskid;
 #include "pppd.h"
 #include "fsm.h"
 #include "ipcp.h"
-
-static const char rcsid[] = RCSID;
-
 
 static int initdisc = -1;	/* Initial TTY discipline for ppp_fd */
 static int initfdflags = -1;	/* Initial file descriptor flags for ppp_fd */
@@ -446,20 +441,6 @@ setdtr(
     int modembits = TIOCM_DTR;
 
     ioctl(fd, (on? TIOCMBIS: TIOCMBIC), &modembits);
-}
-
-/*
- * get_pty - get a pty master/slave pair and chown the slave side
- * to the uid given.  Assumes slave_name points to >= 12 bytes of space.
- */
-int
-get_pty(
-    int *master_fdp,
-    int *slave_fdp,
-    char *slave_name,
-    int uid)
-{
-    return 1;
 }
 
 

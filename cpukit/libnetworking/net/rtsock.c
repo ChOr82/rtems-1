@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 /*
  * Copyright (c) 1988, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -48,6 +50,7 @@
 #include <sys/protosw.h>
 
 #include <net/if.h>
+#include <net/if_var.h>
 #include <net/route.h>
 #include <net/raw_cb.h>
 

@@ -48,8 +48,7 @@ rtems_task Init(
   status = rtems_task_start( Task_id[ 1 ], Test_task, 0 );
   directive_failed( status, "rtems_task_start" );
 
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
+  rtems_task_exit();
 }
 
 rtems_task Test_task (
@@ -82,7 +81,7 @@ rtems_task Test_task (
     end_time,
     1,
     0,
-    CALLING_OVERHEAD_PORT_CREATE
+    0
   );
 
   benchmark_timer_initialize();
@@ -99,7 +98,7 @@ rtems_task Test_task (
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_PORT_EXTERNAL_TO_INTERNAL
+    0
   );
 
   benchmark_timer_initialize();
@@ -116,7 +115,7 @@ rtems_task Test_task (
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_PORT_INTERNAL_TO_EXTERNAL
+    0
   );
 
   benchmark_timer_initialize();
@@ -128,7 +127,7 @@ rtems_task Test_task (
     end_time,
     1,
     0,
-    CALLING_OVERHEAD_PORT_DELETE
+    0
   );
 
   TEST_END();

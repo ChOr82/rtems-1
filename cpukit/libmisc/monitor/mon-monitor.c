@@ -32,11 +32,6 @@
 
 #include <rtems/monitor.h>
 
-/* set by trap handler */
-extern rtems_tcb       *debugger_interrupted_task;
-extern rtems_context   *debugger_interrupted_task_context;
-extern uint32_t   debugger_trap;
-
 /*
  * Various id's for the monitor
  * They need to be public variables for access by other agencies
@@ -223,7 +218,6 @@ static const rtems_monitor_command_entry_t rtems_monitor_commands[] = {
 #else
   #define RTEMS_MONITOR_POSIX_NEXT 19
 #endif
-#ifdef RTEMS_POSIX_API
     { "pthread",
       "Display information about the specified pthreads. "
       "Default is to display information about all pthreads on this node.\n"
@@ -234,9 +228,6 @@ static const rtems_monitor_command_entry_t rtems_monitor_commands[] = {
       &rtems_monitor_commands[RTEMS_MONITOR_POSIX_NEXT],
     },
   #define RTEMS_MONITOR_DEBUGGER_NEXT (RTEMS_MONITOR_POSIX_NEXT + 1)
-#else
-  #define RTEMS_MONITOR_DEBUGGER_NEXT RTEMS_MONITOR_POSIX_NEXT
-#endif
 #ifdef CPU_INVOKE_DEBUGGER
     { "debugger",
       "Enter the debugger, if possible. "
@@ -297,10 +288,10 @@ rtems_monitor_wakeup(void)
 }
 
 void rtems_monitor_debugger_cmd(
-  int                                argc __attribute__((unused)),
-  char                             **argv __attribute__((unused)),
-  const rtems_monitor_command_arg_t *command_arg __attribute__((unused)),
-  bool                               verbose __attribute__((unused))
+  int                                argc RTEMS_UNUSED,
+  char                             **argv RTEMS_UNUSED,
+  const rtems_monitor_command_arg_t *command_arg RTEMS_UNUSED,
+  bool                               verbose RTEMS_UNUSED
 )
 {
 #ifdef CPU_INVOKE_DEBUGGER
@@ -311,8 +302,8 @@ void rtems_monitor_debugger_cmd(
 void rtems_monitor_pause_cmd(
   int                                argc,
   char                             **argv,
-  const rtems_monitor_command_arg_t *command_arg __attribute__((unused)),
-  bool                               verbose __attribute__((unused))
+  const rtems_monitor_command_arg_t *command_arg RTEMS_UNUSED,
+  bool                               verbose RTEMS_UNUSED
 )
 {
     if (argc == 1)
@@ -325,7 +316,7 @@ void rtems_monitor_fatal_cmd(
   int                                argc,
   char                             **argv,
   const rtems_monitor_command_arg_t *command_arg,
-  bool                               verbose __attribute__((unused))
+  bool                               verbose RTEMS_UNUSED
 )
 {
     if (argc == 1)
@@ -335,10 +326,10 @@ void rtems_monitor_fatal_cmd(
 }
 
 void rtems_monitor_continue_cmd(
-  int                                argc __attribute__((unused)),
-  char                             **argv __attribute__((unused)),
-  const rtems_monitor_command_arg_t *command_arg __attribute__((unused)),
-  bool                               verbose __attribute__((unused))
+  int                                argc RTEMS_UNUSED,
+  char                             **argv RTEMS_UNUSED,
+  const rtems_monitor_command_arg_t *command_arg RTEMS_UNUSED,
+  bool                               verbose RTEMS_UNUSED
 )
 {
     rtems_monitor_suspend(RTEMS_NO_TIMEOUT);
@@ -348,8 +339,8 @@ void rtems_monitor_continue_cmd(
 void rtems_monitor_node_cmd(
   int                                argc,
   char                             **argv,
-  const rtems_monitor_command_arg_t *command_arg __attribute__((unused)),
-  bool                               verbose __attribute__((unused))
+  const rtems_monitor_command_arg_t *command_arg RTEMS_UNUSED,
+  bool                               verbose RTEMS_UNUSED
 )
 {
   uint32_t   new_node = rtems_monitor_default_node;

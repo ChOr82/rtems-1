@@ -17,10 +17,9 @@
 #include <timesys.h>
 #include <rtems/btimer.h>
 #include <rtems/score/schedulerpriorityimpl.h>
-#include <coverhd.h>
 
 /* configuration information */
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 #define CONFIGURE_MAXIMUM_TASKS              2
 #define CONFIGURE_TICKS_PER_TIMESLICE        0
@@ -89,8 +88,7 @@ rtems_task Init(
   benchmark_timer_initialize();
   timer_overhead = benchmark_timer_read();
 
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
+  rtems_task_exit();
 }
 
 rtems_task Task_1(

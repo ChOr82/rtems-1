@@ -7,12 +7,13 @@
  */
 
 /*
- * Copyright (c) 2010
- * embedded brains GmbH
- * Obere Lagerstr. 30
- * D-82178 Puchheim
- * Germany
- * <rtems@embedded-brains.de>
+ * Copyright (c) 2010, 2018 embedded brains GmbH.
+ *
+ *   embedded brains GmbH
+ *   Dornierstr. 4
+ *   D-82178 Puchheim
+ *   Germany
+ *   <rtems@embedded-brains.de>
  *
  * The license and distribution terms for this file may be
  * found in the file LICENSE in this distribution or at
@@ -23,20 +24,20 @@
 #include "config.h"
 #endif
 
+#include "tmacros.h"
+
+#include <sys/stat.h>
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #include <rtems.h>
 #include <rtems/bdbuf.h>
-#include <rtems/diskdevs.h>
 #include <rtems/test.h>
 
-#include <bsp.h>
-
 const char rtems_test_name[] = "BLOCK 10";
-
-/* forward declarations to avoid warnings */
-static rtems_task Init(rtems_task_argument argument);
 
 #define ASSERT_SC(sc) assert((sc) == RTEMS_SUCCESSFUL)
 
@@ -56,6 +57,8 @@ static rtems_task Init(rtems_task_argument argument);
 
 #define BLOCK_COUNT 1
 
+#define DISK_PATH "/disk"
+
 typedef rtems_bdbuf_buffer *(*access_func)(char task);
 
 typedef void (*release_func)(char task, rtems_bdbuf_buffer *bd);
@@ -67,11 +70,6 @@ static rtems_id task_id_init;
 static rtems_id task_id_purger;
 
 static rtems_id task_id_waiter;
-
-static const rtems_driver_address_table disk_ops = {
-  .initialization_entry = NULL,
-  RTEMS_GENERIC_BLOCK_DEVICE_DRIVER_ENTRIES
-};
 
 static void set_task_prio(rtems_id task, rtems_task_priority prio)
 {
@@ -118,34 +116,33 @@ static int disk_ioctl(rtems_disk_device *dd, uint32_t req, void *arg)
   }
 }
 
-static rtems_status_code disk_register(
+static void disk_register(
   uint32_t block_size,
   rtems_blkdev_bnum block_count,
-  dev_t *dev_ptr
+  rtems_disk_device **dd
 )
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
-  rtems_device_major_number major = 0;
-  dev_t dev = 0;
+  int fd;
+  int rv;
 
-  sc = rtems_io_register_driver(0, &disk_ops, &major);
-  ASSERT_SC(sc);
-
-  dev = rtems_filesystem_make_dev_t(major, 0);
-
-  sc = rtems_disk_create_phys(
-    dev,
+  sc = rtems_blkdev_create(
+    DISK_PATH,
     block_size,
     block_count,
     disk_ioctl,
-    NULL,
     NULL
   );
   ASSERT_SC(sc);
 
-  *dev_ptr = dev;
+  fd = open(DISK_PATH, O_RDWR);
+  rtems_test_assert(fd >= 0);
 
-  return RTEMS_SUCCESSFUL;
+  rv = rtems_disk_fd_get_disk_device(fd, dd);
+  rtems_test_assert(rv == 0);
+
+  rv = close(fd);
+  rtems_test_assert(rv == 0);
 }
 
 static rtems_bdbuf_buffer *do_get(char task)
@@ -153,12 +150,12 @@ static rtems_bdbuf_buffer *do_get(char task)
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_bdbuf_buffer *bd = NULL;
 
-  printk("%c: try get\n", task);
+  printf("%c: try get\n", task);
 
   sc = rtems_bdbuf_get(dd, 0, &bd);
   ASSERT_SC(sc);
 
-  printk("%c: get\n", task);
+  printf("%c: get\n", task);
 
   return bd;
 }
@@ -168,7 +165,7 @@ static rtems_bdbuf_buffer *do_get_mod(char task)
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_bdbuf_buffer *bd = NULL;
 
-  printk("%c: try get modified\n", task);
+  printf("%c: try get modified\n", task);
 
   sc = rtems_bdbuf_get(dd, 0, &bd);
   ASSERT_SC(sc);
@@ -179,7 +176,7 @@ static rtems_bdbuf_buffer *do_get_mod(char task)
   sc = rtems_bdbuf_get(dd, 0, &bd);
   ASSERT_SC(sc);
 
-  printk("%c: get modified\n", task);
+  printf("%c: get modified\n", task);
 
   return bd;
 }
@@ -189,12 +186,12 @@ static rtems_bdbuf_buffer *do_read(char task)
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_bdbuf_buffer *bd = NULL;
 
-  printk("%c: try read\n", task);
+  printf("%c: try read\n", task);
 
   sc = rtems_bdbuf_read(dd, 0, &bd);
   ASSERT_SC(sc);
 
-  printk("%c: read\n", task);
+  printf("%c: read\n", task);
 
   return bd;
 }
@@ -203,41 +200,41 @@ static void do_rel(char task, rtems_bdbuf_buffer *bd)
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
 
-  printk("%c: release\n", task);
+  printf("%c: release\n", task);
 
   sc = rtems_bdbuf_release(bd);
   ASSERT_SC(sc);
 
-  printk("%c: release done\n", task);
+  printf("%c: release done\n", task);
 }
 
 static void do_rel_mod(char task, rtems_bdbuf_buffer *bd)
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
 
-  printk("%c: release modified\n", task);
+  printf("%c: release modified\n", task);
 
   sc = rtems_bdbuf_release_modified(bd);
   ASSERT_SC(sc);
 
-  printk("%c: release modified done\n", task);
+  printf("%c: release modified done\n", task);
 }
 
 static void do_sync(char task, rtems_bdbuf_buffer *bd)
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
 
-  printk("%c: sync\n", task);
+  printf("%c: sync\n", task);
 
   sc = rtems_bdbuf_sync(bd);
   ASSERT_SC(sc);
 
-  printk("%c: sync done\n", task);
+  printf("%c: sync done\n", task);
 }
 
 static void purge(char task)
 {
-  printk("%c: purge\n", task);
+  printf("%c: purge\n", task);
 
   rtems_bdbuf_purge_dev(dd);
 }
@@ -252,7 +249,7 @@ static void task_purger(rtems_task_argument arg)
     purge('P');
   }
 
-  rtems_task_delete(RTEMS_SELF);
+  rtems_task_exit();
 }
 
 static void activate_purger(rtems_task_priority prio)
@@ -273,7 +270,7 @@ static void task_waiter(rtems_task_argument arg)
     do_rel('W', bd);
   }
 
-  rtems_task_delete(RTEMS_SELF);
+  rtems_task_exit();
 }
 
 static void create_waiter(void)
@@ -395,24 +392,16 @@ static const char *purger_assoc_table [PURGER_COUNT] = {
 static rtems_task Init(rtems_task_argument argument)
 {
   rtems_status_code sc = RTEMS_SUCCESSFUL;
-  dev_t dev = 0;
   size_t i_w = 0;
   size_t i_ac = 0;
   size_t i_rel = 0;
   size_t i_p = 0;
 
-  rtems_test_begink();
+  TEST_BEGIN();
 
   task_id_init = rtems_task_self();
 
-  sc = rtems_disk_io_initialize();
-  ASSERT_SC(sc);
-
-  sc = disk_register(BLOCK_SIZE, BLOCK_COUNT, &dev);
-  ASSERT_SC(sc);
-
-  dd = rtems_disk_obtain(dev);
-  assert(dd != NULL);
+  disk_register(BLOCK_SIZE, BLOCK_COUNT, &dd);
 
   sc = rtems_task_create(
     rtems_build_name('P', 'U', 'R', 'G'),
@@ -445,7 +434,7 @@ static rtems_task Init(rtems_task_argument argument)
   for (i_ac = 0; i_ac < ACCESS_COUNT; ++i_ac) {
     for (i_rel = 0; i_rel < RELEASE_COUNT; ++i_rel) {
       for (i_w = 0; i_w < WAITER_COUNT; ++i_w) {
-        printk("test case [access]: %s and %s %s\n", access_assoc_table [i_ac], release_assoc_table [i_rel], waiter_assoc_table [i_w]);
+        printf("test case [access]: %s and %s %s\n", access_assoc_table [i_ac], release_assoc_table [i_rel], waiter_assoc_table [i_w]);
         check_access(access_table [i_ac], release_table [i_rel], waiter_table [i_w]);
       }
     }
@@ -453,19 +442,19 @@ static rtems_task Init(rtems_task_argument argument)
 
   for (i_rel = 0; i_rel < RELEASE_COUNT; ++i_rel) {
     for (i_w = 0; i_w < WAITER_COUNT; ++i_w) {
-      printk("test case [intermediate]: %s %s\n", release_assoc_table [i_rel], waiter_assoc_table [i_w]);
+      printf("test case [intermediate]: %s %s\n", release_assoc_table [i_rel], waiter_assoc_table [i_w]);
       check_intermediate(release_table [i_rel], waiter_table [i_w]);
     }
   }
 
   for (i_p = 0; i_p < PURGER_COUNT; ++i_p) {
     for (i_w = 0; i_w < WAITER_COUNT; ++i_w) {
-      printk("test case [transfer]: %s %s\n", purger_assoc_table [i_p], waiter_assoc_table [i_w]);
+      printf("test case [transfer]: %s %s\n", purger_assoc_table [i_p], waiter_assoc_table [i_w]);
       check_transfer(purger_table [i_p], waiter_table [i_w]);
     }
   }
 
-  rtems_test_endk();
+  TEST_END();
 
   exit(0);
 }
@@ -473,11 +462,12 @@ static rtems_task Init(rtems_task_argument argument)
 #define CONFIGURE_INIT
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
 
+#define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4
+
 #define CONFIGURE_MAXIMUM_TASKS 3
-#define CONFIGURE_MAXIMUM_DRIVERS 4
 
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 

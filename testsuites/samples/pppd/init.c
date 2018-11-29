@@ -22,6 +22,7 @@
 #include <rtems/rtemspppd.h>
 #include <rtems/shell.h>
 #include "netconfig.h"
+#include <tmacros.h>
 
 const char rtems_test_name[] = "PPPD";
 
@@ -37,7 +38,9 @@ rtems_task Init(rtems_task_argument argument)
 {
   rtems_status_code status;
 
-  rtems_test_begin();
+  rtems_print_printer_fprintf_putc(&rtems_test_printer);
+
+  TEST_BEGIN();
 
   status = rtems_shell_wait_for_input(
     STDIN_FILENO,
@@ -46,7 +49,7 @@ rtems_task Init(rtems_task_argument argument)
     NULL
   );
   if (status != RTEMS_SUCCESSFUL) {
-    rtems_test_end();
+    TEST_END();
     exit( 0 );
   }
 
@@ -54,5 +57,5 @@ rtems_task Init(rtems_task_argument argument)
   rtems_bsdnet_initialize_network();
   rtems_pppd_initialize();
   pppdapp_initialize();
-  rtems_task_delete(RTEMS_SELF);
+  rtems_task_exit();
 }

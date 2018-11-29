@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2015, 2016 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
  *  Dornierstr. 4
@@ -21,6 +21,7 @@
 #include <sys/lock.h>
 #include <errno.h>
 #include <limits.h>
+#include <setjmp.h>
 #include <string.h>
 #include <time.h>
 
@@ -33,8 +34,6 @@ const char rtems_test_name[] = "SPSYSLOCK 1";
 #define EVENT_MTX_RELEASE RTEMS_EVENT_1
 
 #define EVENT_MTX_PRIO_INV RTEMS_EVENT_2
-
-#define EVENT_MTX_DEADLOCK RTEMS_EVENT_3
 
 #define EVENT_REC_MTX_ACQUIRE RTEMS_EVENT_4
 
@@ -63,6 +62,7 @@ typedef struct {
   int eno[2];
   int generation[2];
   int current_generation[2];
+  jmp_buf deadlock_return_context;
 } test_context;
 
 static test_context test_instance;
@@ -94,6 +94,60 @@ static void get_abs_timeout(struct timespec *to)
   }
 }
 
+static bool eq_tq(
+  const struct _Thread_queue_Queue *a,
+  const struct _Thread_queue_Queue *b
+)
+{
+  return a->_Lock._next_ticket == b->_Lock._next_ticket
+    && a->_Lock._now_serving == b->_Lock._now_serving
+    && a->_heads == b->_heads
+    && a->_owner == b->_owner
+    && a->_name == b->_name;
+}
+
+static bool eq_mtx(
+  const struct _Mutex_Control *a,
+  const struct _Mutex_Control *b
+)
+{
+  return eq_tq(&a->_Queue, &b->_Queue);
+}
+
+static bool eq_rec_mtx(
+  const struct _Mutex_recursive_Control *a,
+  const struct _Mutex_recursive_Control *b
+)
+{
+  return eq_mtx(&a->_Mutex, &b->_Mutex)
+    && a->_nest_level == b->_nest_level;
+}
+
+static bool eq_cond(
+  const struct _Condition_Control *a,
+  const struct _Condition_Control *b
+)
+{
+  return eq_tq(&a->_Queue, &b->_Queue);
+}
+
+static bool eq_sem(
+  const struct _Semaphore_Control *a,
+  const struct _Semaphore_Control *b
+)
+{
+  return eq_tq(&a->_Queue, &b->_Queue)
+    && a->_count == b->_count;
+}
+
+static bool eq_futex(
+  const struct _Futex_Control *a,
+  const struct _Futex_Control *b
+)
+{
+  return eq_tq(&a->_Queue, &b->_Queue);
+}
+
 static void test_initialization(test_context *ctx)
 {
   struct _Mutex_Control mtx = _MUTEX_INITIALIZER;
@@ -108,11 +162,11 @@ static void test_initialization(test_context *ctx)
   _Semaphore_Initialize(&ctx->sem, 1);
   _Futex_Initialize(&ctx->futex);
 
-  rtems_test_assert(memcmp(&mtx, &ctx->mtx, sizeof(mtx)) == 0);
-  rtems_test_assert(memcmp(&rec_mtx, &ctx->rec_mtx, sizeof(rec_mtx)) == 0);
-  rtems_test_assert(memcmp(&cond, &ctx->cond, sizeof(cond)) == 0);
-  rtems_test_assert(memcmp(&sem, &ctx->sem, sizeof(sem)) == 0);
-  rtems_test_assert(memcmp(&futex, &ctx->futex, sizeof(futex)) == 0);
+  rtems_test_assert(eq_mtx(&mtx, &ctx->mtx));
+  rtems_test_assert(eq_rec_mtx(&rec_mtx, &ctx->rec_mtx));
+  rtems_test_assert(eq_cond(&cond, &ctx->cond));
+  rtems_test_assert(eq_sem(&sem, &ctx->sem));
+  rtems_test_assert(eq_futex(&futex, &ctx->futex));
 
   _Mutex_Destroy(&mtx);
   _Mutex_recursive_Destroy(&rec_mtx);
@@ -125,32 +179,32 @@ static void test_recursive_acquire_normal(test_context *ctx)
 {
   struct _Mutex_Control *mtx = &ctx->mtx;
   size_t idx = 0;
-  int success;
+  int eno;
 
-  success = _Mutex_Try_acquire(mtx);
-  rtems_test_assert(success == 1);
+  eno = _Mutex_Try_acquire(mtx);
+  rtems_test_assert(eno == 0);
 
-  success = _Mutex_Try_acquire(mtx);
-  rtems_test_assert(success == 0);
+  eno = _Mutex_Try_acquire(mtx);
+  rtems_test_assert(eno == EBUSY);
 
   _Mutex_Release(mtx);
 
-  success = _Mutex_Try_acquire(mtx);
-  rtems_test_assert(success == 1);
+  eno = _Mutex_Try_acquire(mtx);
+  rtems_test_assert(eno == 0);
 
   _Mutex_Release(mtx);
 
   _Mutex_Acquire(mtx);
 
-  success = _Mutex_Try_acquire(mtx);
-  rtems_test_assert(success == 0);
+  eno = _Mutex_Try_acquire(mtx);
+  rtems_test_assert(eno == EBUSY);
 
   _Mutex_Release(mtx);
 
   send_event(ctx, idx, EVENT_MTX_ACQUIRE);
 
-  success = _Mutex_Try_acquire(mtx);
-  rtems_test_assert(success == 0);
+  eno = _Mutex_Try_acquire(mtx);
+  rtems_test_assert(eno == EBUSY);
 
   send_event(ctx, idx, EVENT_MTX_RELEASE);
 }
@@ -159,15 +213,15 @@ static void test_recursive_acquire_recursive(test_context *ctx)
 {
   struct _Mutex_recursive_Control *mtx = &ctx->rec_mtx;
   size_t idx = 0;
-  int success;
+  int eno;
 
-  success = _Mutex_recursive_Try_acquire(mtx);
-  rtems_test_assert(success == 1);
+  eno = _Mutex_recursive_Try_acquire(mtx);
+  rtems_test_assert(eno == 0);
 
   _Mutex_recursive_Acquire(mtx);
 
-  success = _Mutex_recursive_Try_acquire(mtx);
-  rtems_test_assert(success == 1);
+  eno = _Mutex_recursive_Try_acquire(mtx);
+  rtems_test_assert(eno == 0);
 
   _Mutex_recursive_Release(mtx);
   _Mutex_recursive_Release(mtx);
@@ -175,8 +229,8 @@ static void test_recursive_acquire_recursive(test_context *ctx)
 
   send_event(ctx, idx, EVENT_REC_MTX_ACQUIRE);
 
-  success = _Mutex_recursive_Try_acquire(mtx);
-  rtems_test_assert(success == 0);
+  eno = _Mutex_recursive_Try_acquire(mtx);
+  rtems_test_assert(eno == EBUSY);
 
   send_event(ctx, idx, EVENT_REC_MTX_RELEASE);
 }
@@ -294,6 +348,19 @@ static void test_mtx_timeout_recursive(test_context *ctx)
   rtems_test_assert(eno == ETIMEDOUT);
 
   send_event(ctx, idx, EVENT_REC_MTX_RELEASE);
+}
+
+static void test_mtx_deadlock(test_context *ctx)
+{
+  struct _Mutex_Control *mtx = &ctx->mtx;
+
+  _Mutex_Acquire(mtx);
+
+  if (setjmp(ctx->deadlock_return_context) == 0) {
+    _Mutex_Acquire(mtx);
+  }
+
+  _Mutex_Release(mtx);
 }
 
 static void test_condition(test_context *ctx)
@@ -536,13 +603,6 @@ static void high_task(rtems_task_argument idx)
       rtems_test_assert(sc == RTEMS_SUCCESSFUL);
     }
 
-    if ((events & EVENT_MTX_DEADLOCK) != 0) {
-      struct _Mutex_Control dead = _MUTEX_INITIALIZER;
-
-      _Mutex_Acquire(&dead);
-      _Mutex_Acquire(&dead);
-    }
-
     if ((events & EVENT_REC_MTX_ACQUIRE) != 0) {
       _Mutex_recursive_Acquire(&ctx->rec_mtx);
     }
@@ -644,6 +704,7 @@ static void test(void)
   test_prio_inv_recursive(ctx);
   test_mtx_timeout_normal(ctx);
   test_mtx_timeout_recursive(ctx);
+  test_mtx_deadlock(ctx);
   test_condition(ctx);
   test_condition_timeout(ctx);
   test_sem(ctx);
@@ -651,7 +712,14 @@ static void test(void)
   test_futex(ctx);
   test_sched();
 
-  send_event(ctx, 0, EVENT_MTX_DEADLOCK);
+  sc = rtems_task_delete(ctx->mid);
+  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+
+  sc = rtems_task_delete(ctx->high[0]);
+  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+
+  sc = rtems_task_delete(ctx->high[1]);
+  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
   _Mutex_Destroy(&ctx->mtx);
   _Mutex_recursive_Destroy(&ctx->rec_mtx);
@@ -670,16 +738,34 @@ static void Init(rtems_task_argument arg)
   rtems_test_exit(0);
 }
 
+static void fatal_extension(
+  rtems_fatal_source source,
+  bool always_set_to_false,
+  rtems_fatal_code error
+)
+{
+
+  if (
+    source == INTERNAL_ERROR_CORE
+      && !always_set_to_false
+      && error == INTERNAL_ERROR_THREAD_QUEUE_DEADLOCK
+  ) {
+    test_context *ctx = &test_instance;
+
+    longjmp(ctx->deadlock_return_context, 1);
+  }
+}
+
 #define CONFIGURE_MICROSECONDS_PER_TICK US_PER_TICK
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
-
-#define CONFIGURE_USE_IMFS_AS_BASE_FILESYSTEM
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS 4
 
-#define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
+#define CONFIGURE_INITIAL_EXTENSIONS \
+  { .fatal = fatal_extension }, \
+  RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_INIT_TASK_PRIORITY 4
 #define CONFIGURE_INIT_TASK_INITIAL_MODES RTEMS_DEFAULT_MODES

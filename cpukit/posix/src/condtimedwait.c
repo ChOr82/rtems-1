@@ -18,13 +18,8 @@
 #include "config.h"
 #endif
 
-#include <pthread.h>
-#include <errno.h>
-
-#include <rtems/system.h>
-#include <rtems/score/todimpl.h>
 #include <rtems/posix/condimpl.h>
-#include <rtems/posix/muteximpl.h>
+#include <rtems/score/todimpl.h>
 
 /*
  *  11.4.4 Waiting on a Condition, P1003.1c/Draft 10, p. 105
@@ -36,32 +31,12 @@ int pthread_cond_timedwait(
   const struct timespec *abstime
 )
 {
-  Watchdog_Interval                            ticks;
-  bool                                         already_timedout;
-  TOD_Absolute_timeout_conversion_results  status;
-
-  /*
-   *  POSIX requires that blocking calls with timeouts that take
-   *  an absolute timeout must ignore issues with the absolute
-   *  time provided if the operation would otherwise succeed.
-   *  So we check the abstime provided, and hold on to whether it
-   *  is valid or not.  If it isn't correct and in the future,
-   *  then we do a polling operation and convert the UNSATISFIED
-   *  status into the appropriate error.
-   */
-  already_timedout = false;
-  status = _TOD_Absolute_timeout_to_ticks(abstime, &ticks);
-  if ( status == TOD_ABSOLUTE_TIMEOUT_INVALID )
-    return EINVAL;
-
-  if ( status == TOD_ABSOLUTE_TIMEOUT_IS_IN_PAST ||
-       status == TOD_ABSOLUTE_TIMEOUT_IS_NOW )
-    already_timedout = true;
-
+  if ( abstime == NULL ) {
+    return EINVAL; /* not specified */
+  }
   return _POSIX_Condition_variables_Wait_support(
     cond,
     mutex,
-    ticks,
-    already_timedout
+    abstime
   );
 }

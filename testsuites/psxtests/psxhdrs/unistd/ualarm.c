@@ -1,7 +1,9 @@
 /*
  *  This test file is used to verify that the header files associated with
  *  invoking this function are correct.
- *
+ */
+
+/*
  *  COPYRIGHT (c) 1989-2009.
  *  On-Line Applications Research Corporation (OAR).
  *
@@ -14,12 +16,8 @@
 #include "config.h"
 #endif
 
-#include <signal.h>
+#include <unistd.h>
 
-/* FIXME: POSIX.1-2001 marks ualarm() as obsolete.
- * POSIX.1-2008 removes the specification of ualarm(). */
-
-useconds_t _EXFUN(ualarm, (useconds_t __useconds, useconds_t __interval));
 int test( void );
 
 int test( void )

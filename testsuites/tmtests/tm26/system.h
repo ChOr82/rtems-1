@@ -11,7 +11,6 @@
  */
 
 
-#include <coverhd.h>
 #include <tmacros.h>
 
 /* functions */
@@ -24,7 +23,7 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS              (6 + OPERATION_COUNT)
@@ -32,6 +31,7 @@ rtems_task Init(
 #define CONFIGURE_TICKS_PER_TIMESLICE        0
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
+#define CONFIGURE_INIT_TASK_ATTRIBUTES       RTEMS_FLOATING_POINT
 
 #define CONFIGURE_SCHEDULER_PRIORITY
 

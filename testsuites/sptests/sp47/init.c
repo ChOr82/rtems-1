@@ -10,8 +10,7 @@
 
 const char rtems_test_name[] = "SP 47";
 
-#define PRIXModes_Control 	PRIX32
-#define PRIXrtems_mode		PRIXModes_Control
+#define PRIXrtems_mode 	PRIX32
 
 rtems_task test_asr(rtems_task_argument unused);
 rtems_task Init(rtems_task_argument ignored);
@@ -57,12 +56,12 @@ rtems_task Init(rtems_task_argument ignored)
 
   rtems_task_start(ti, test_asr, 0);
 
-  rtems_task_delete(RTEMS_SELF);
+  rtems_task_exit();
 }
 
 /* configuration stuff */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MICROSECONDS_PER_TICK 10000

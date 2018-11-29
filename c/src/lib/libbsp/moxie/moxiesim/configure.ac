@@ -4,24 +4,23 @@
 
 AC_PREREQ(2.60)
 AC_INIT([rtems-c-src-lib-libbsp-moxie-moxiesim],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
-AC_CONFIG_SRCDIR([bsp_specs])
 RTEMS_TOP(../../../../../..)
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
+RTEMS_BSP_LINKCMDS
 
 RTEMS_CANONICAL_TARGET_CPU
-AM_INIT_AUTOMAKE([no-define nostdinc foreign 1.10])
+AM_INIT_AUTOMAKE([no-define nostdinc foreign 1.12.2])
 RTEMS_BSP_CONFIGURE
 
-RTEMS_PROG_CC_FOR_TARGET
-RTEMS_CANONICALIZE_TOOLS
-RTEMS_PROG_CCAS
 
-RTEMS_BSP_CLEANUP_OPTIONS(0, 0)
+RTEMS_BSP_CLEANUP_OPTIONS
 
 AC_MSG_CHECKING([for old moxie assembly syntax])
 AC_COMPILE_IFELSE(
   [AC_LANG_PROGRAM(
     [],
-    [asm("sub.l $r0, $r0");])],
+    [asm("sub.l \$r0, \$r0");])],
   [HAVE_OLD_MOXIE_ASM=yes],
   [HAVE_OLD_MOXIE_ASM=no])
 AC_MSG_RESULT([$HAVE_OLD_MOXIE_ASM])

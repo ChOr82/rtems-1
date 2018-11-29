@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2012, 2016 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
  *  Dornierstr. 4
@@ -64,10 +64,12 @@ RTEMS_STATIC_ASSERT(
   );
 #endif
 
-RTEMS_STATIC_ASSERT(
-  sizeof( CPU_Per_CPU_control ) == CPU_PER_CPU_CONTROL_SIZE,
-  CPU_PER_CPU_CONTROL_SIZE
-);
+#if CPU_PER_CPU_CONTROL_SIZE > 0
+  RTEMS_STATIC_ASSERT(
+    sizeof( CPU_Per_CPU_control ) == CPU_PER_CPU_CONTROL_SIZE,
+    CPU_PER_CPU_CONTROL_SIZE
+  );
+#endif
 
 #if defined( RTEMS_SMP )
   RTEMS_STATIC_ASSERT(
@@ -79,6 +81,12 @@ RTEMS_STATIC_ASSERT(
 RTEMS_STATIC_ASSERT(
   offsetof(Per_CPU_Control, isr_nest_level) == PER_CPU_ISR_NEST_LEVEL,
   PER_CPU_ISR_NEST_LEVEL
+);
+
+RTEMS_STATIC_ASSERT(
+  offsetof(Per_CPU_Control, isr_dispatch_disable)
+    == PER_CPU_ISR_DISPATCH_DISABLE,
+  PER_CPU_ISR_DISPATCH_DISABLE
 );
 
 RTEMS_STATIC_ASSERT(
@@ -102,17 +110,26 @@ RTEMS_STATIC_ASSERT(
   PER_CPU_DISPATCH_NEEDED
 );
 
-#if CPU_ALLOCATE_INTERRUPT_STACK == TRUE \
-  || CPU_HAS_SOFTWARE_INTERRUPT_STACK == TRUE
-  RTEMS_STATIC_ASSERT(
-    offsetof(Per_CPU_Control, interrupt_stack_low)
-      == PER_CPU_INTERRUPT_STACK_LOW,
-    PER_CPU_INTERRUPT_STACK_LOW
-  );
+#if defined(RTEMS_SMP)
+RTEMS_STATIC_ASSERT(
+  offsetof(Per_CPU_Control, Interrupt_frame) == PER_CPU_INTERRUPT_FRAME_AREA,
+  PER_CPU_INTERRUPT_FRAME_AREA
+);
 
-  RTEMS_STATIC_ASSERT(
-    offsetof(Per_CPU_Control, interrupt_stack_high)
-      == PER_CPU_INTERRUPT_STACK_HIGH,
-    PER_CPU_INTERRUPT_STACK_HIGH
-  );
+RTEMS_STATIC_ASSERT(
+  sizeof( CPU_Interrupt_frame ) == CPU_INTERRUPT_FRAME_SIZE,
+  CPU_INTERRUPT_FRAME_SIZE
+);
 #endif
+
+RTEMS_STATIC_ASSERT(
+  offsetof(Per_CPU_Control, interrupt_stack_low)
+    == PER_CPU_INTERRUPT_STACK_LOW,
+  PER_CPU_INTERRUPT_STACK_LOW
+);
+
+RTEMS_STATIC_ASSERT(
+  offsetof(Per_CPU_Control, interrupt_stack_high)
+    == PER_CPU_INTERRUPT_STACK_HIGH,
+  PER_CPU_INTERRUPT_STACK_HIGH
+);

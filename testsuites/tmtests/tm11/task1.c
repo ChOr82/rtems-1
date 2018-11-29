@@ -58,8 +58,7 @@ void Init(
   status = rtems_task_start( id, test_init, 0 );
   directive_failed( status, "rtems_task_start" );
 
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
+  rtems_task_exit();
 }
 
 #define MESSAGE_SIZE (sizeof(long) * 4)
@@ -154,7 +153,7 @@ rtems_task High_task(
     end_time,
     operation_count,
     0,
-    CALLING_OVERHEAD_MESSAGE_QUEUE_SEND
+    0
   );
 
   TEST_END();

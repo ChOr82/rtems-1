@@ -24,11 +24,17 @@ AC_DEFUN([RTEMS_PROG_CC_FOR_TARGET],
 dnl check target cc
 RTEMS_PROG_CC
 
+dnl check if the compiler supports -specs
+RTEMS_GCC_SPECS
+
 AS_IF([test x"$GCC" = xyes],[
-AS_IF([test "${enable_cpukit_root+set}"],[
-  GCCSPECS="-B\$(CPUKIT_ROOT)/lib/"])
-AS_IF([test "${enable_project_root+set}"],[
-  GCCSPECS="$GCCSPECS -B\$(PROJECT_ROOT)/lib/"])
-GCCSPECS="${GCCSPECS} -specs bsp_specs -qrtems"])
+GCCSPECS="-B\$(RTEMS_SOURCE_ROOT)/bsps/\$(RTEMS_CPU)/\$(RTEMS_BSP_FAMILY)/start"
+AS_IF([test x"$rtems_cv_gcc_specs" = xyes],[
+GCCSPECS="${GCCSPECS} -specs bsp_specs"])
+GCCSPECS="${GCCSPECS} -qrtems"])
 AC_SUBST(GCCSPECS)
+
+RTEMS_INCLUDES
+RTEMS_BSP_INCLUDES
+RTEMS_BSP_LINKCMDS
 ])

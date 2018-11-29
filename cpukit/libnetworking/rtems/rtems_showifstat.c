@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 #if HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -9,13 +11,15 @@
 #include <sys/sysctl.h>
 #include <sys/proc.h>
 #include <sys/socket.h>
-#include <sys/ioctl.h>
+#include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <net/if.h>
+#include <net/if_var.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
+
+#include <rtems/rtems_bsdnet.h>
 
 /*
  * Display an address

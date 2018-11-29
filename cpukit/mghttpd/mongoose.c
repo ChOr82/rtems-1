@@ -25,6 +25,10 @@
 #if defined(__rtems__)
 #include <md5.h>
 #define HAVE_MD5
+#define NO_CGI
+#define NO_POPEN
+#define NO_SSL
+#define USE_WEBSOCKET
 #endif // __rtems__
 
 #if defined(_WIN32)
@@ -259,7 +263,7 @@ struct pollfd {
 #define POLLIN 1
 #endif
 
-#include "mongoose.h"
+#include <mghttpd/mongoose.h>
 
 #define MONGOOSE_VERSION "3.9"
 #define PASSWORDS_FILE_NAME ".htpasswd"
@@ -2989,10 +2993,16 @@ static void gmt_time_string(char *buf, size_t buf_len, time_t *t) {
   strftime(buf, buf_len, "%a, %d %b %Y %H:%M:%S GMT", gmtime(t));
 }
 
-static void construct_etag(char *buf, size_t buf_len,
+static void construct_etag(const struct mg_connection *conn, const char *path,
+                           char *buf, size_t buf_len,
                            const struct file *filep) {
-  snprintf(buf, buf_len, "\"%lx.%" INT64_FMT "\"",
-           (unsigned long) filep->modification_time, filep->size);
+  if (conn->ctx->callbacks.http_etag != NULL &&
+      conn->ctx->callbacks.http_etag(conn, path, buf, buf_len)) {
+  }
+  else {
+    snprintf(buf, buf_len, "\"%lx.%" INT64_FMT "\"",
+             (unsigned long) filep->modification_time, filep->size);
+  }
 }
 
 static void fclose_on_exec(struct file *filep) {
@@ -3061,7 +3071,7 @@ static void handle_file_request(struct mg_connection *conn, const char *path,
   // http://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.3
   gmt_time_string(date, sizeof(date), &curtime);
   gmt_time_string(lm, sizeof(lm), &filep->modification_time);
-  construct_etag(etag, sizeof(etag), filep);
+  construct_etag(conn, path, etag, sizeof(etag), filep);
 
   (void) mg_printf(conn,
       "HTTP/1.1 %d %s\r\n"
@@ -3221,11 +3231,12 @@ static int substitute_index_file(struct mg_connection *conn, char *path,
 
 // Return True if we should reply 304 Not Modified.
 static int is_not_modified(const struct mg_connection *conn,
+                           const char *path,
                            const struct file *filep) {
   char etag[64];
   const char *ims = mg_get_header(conn, "If-Modified-Since");
   const char *inm = mg_get_header(conn, "If-None-Match");
-  construct_etag(etag, sizeof(etag), filep);
+  construct_etag(conn, path, etag, sizeof(etag), filep);
   return (inm != NULL && !mg_strcasecmp(etag, inm)) ||
     (ims != NULL && filep->modification_time <= parse_date_string(ims));
 }
@@ -4591,7 +4602,7 @@ static void handle_request(struct mg_connection *conn) {
                           strlen(conn->ctx->config[SSI_EXTENSIONS]),
                           path) > 0) {
     handle_ssi_file_request(conn, path);
-  } else if (is_not_modified(conn, &file)) {
+  } else if (is_not_modified(conn, path, &file)) {
     send_http_error(conn, 304, "Not Modified", "%s", "");
   } else {
     handle_file_request(conn, path, &file);
@@ -5519,3 +5530,15 @@ struct mg_context *mg_start(const struct mg_callbacks *callbacks,
 
   return ctx;
 }
+#ifdef __rtems__
+#include <rtems/printer.h>
+
+static int mg_printer_plugin(void *context, const char *fmt, va_list ap) {
+  return mg_vprintf(context, fmt, ap);
+}
+
+void rtems_print_printer_mg_printf(rtems_printer *printer, struct mg_connection *conn) {
+  printer->context = conn;
+  printer->printer = mg_printer_plugin;
+}
+#endif /* __rtems__ */

@@ -358,10 +358,6 @@ void test( void )
   int               file_descriptor;
   uint8_t           fill_pattern = 0;
 
-
-  sc = rtems_disk_io_initialize();
-  rtems_test_assert( sc == RTEMS_SUCCESSFUL );
-
   block_size       = 512;
   block_number     = 4 * 2 * 1024;
   blocks_allocated = 8;
@@ -427,7 +423,7 @@ static void Init( rtems_task_argument arg )
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
 
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4

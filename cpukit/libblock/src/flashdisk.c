@@ -41,11 +41,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include <inttypes.h>
 
-#include "rtems/blkdev.h"
-#include "rtems/diskdevs.h"
-#include "rtems/flashdisk.h"
+#include <rtems/blkdev.h>
+#include <rtems/flashdisk.h>
+#include <rtems/thread.h>
 
 /**
  * Control tracing. It can be compiled out of the code for small
@@ -195,7 +196,7 @@ typedef struct rtems_flashdisk
                                                 erased. */
   rtems_fdisk_segment_ctl_queue failed;    /**< The list of segments that failed
                                                 when being erased. */
-  rtems_id lock;                           /**< Mutex for threading protection.*/
+  rtems_mutex lock;                        /**< Mutex for threading protection.*/
 
   uint8_t* copy_buffer;                    /**< Copy buf used during compacting */
 
@@ -203,16 +204,6 @@ typedef struct rtems_flashdisk
 
   uint32_t starvations;                    /**< Erased blocks starvations counter. */
 } rtems_flashdisk;
-
-/**
- * The array of flash disks we support.
- */
-static rtems_flashdisk* rtems_flashdisks;
-
-/**
- * The number of flash disks we have.
- */
-static uint32_t rtems_flashdisk_count;
 
 /**
  * The CRC16 factor table. Created during initialisation.
@@ -2373,80 +2364,70 @@ rtems_fdisk_print_status (rtems_flashdisk* fd)
 static int
 rtems_fdisk_ioctl (rtems_disk_device *dd, uint32_t req, void* argp)
 {
-  dev_t                     dev = rtems_disk_get_device_identifier (dd);
-  rtems_device_minor_number minor = rtems_filesystem_dev_minor_t (dev);
-  rtems_blkdev_request*     r = argp;
-  rtems_status_code         sc;
+  rtems_flashdisk*      fd = rtems_disk_get_driver_data (dd);
+  rtems_blkdev_request* r = argp;
 
   errno = 0;
 
-  sc = rtems_semaphore_obtain (rtems_flashdisks[minor].lock, RTEMS_WAIT, 0);
-  if (sc != RTEMS_SUCCESSFUL)
-    errno = EIO;
-  else
+  rtems_mutex_lock (&fd->lock);
+
+  switch (req)
   {
-    errno = 0;
-    switch (req)
-    {
-      case RTEMS_BLKIO_REQUEST:
-        if ((minor >= rtems_flashdisk_count) ||
-            (rtems_flashdisks[minor].device_count == 0))
+    case RTEMS_BLKIO_REQUEST:
+      if (fd->device_count == 0)
+      {
+        errno = ENODEV;
+      }
+      else
+      {
+        switch (r->req)
         {
-          errno = ENODEV;
+          case RTEMS_BLKDEV_REQ_READ:
+            errno = rtems_fdisk_read (fd, r);
+            break;
+
+          case RTEMS_BLKDEV_REQ_WRITE:
+            errno = rtems_fdisk_write (fd, r);
+            break;
+
+          default:
+            errno = EINVAL;
+            break;
         }
-        else
-        {
-          switch (r->req)
-          {
-            case RTEMS_BLKDEV_REQ_READ:
-              errno = rtems_fdisk_read (&rtems_flashdisks[minor], r);
-              break;
+      }
+      break;
 
-            case RTEMS_BLKDEV_REQ_WRITE:
-              errno = rtems_fdisk_write (&rtems_flashdisks[minor], r);
-              break;
+    case RTEMS_FDISK_IOCTL_ERASE_DISK:
+      errno = rtems_fdisk_erase_disk (fd);
+      break;
 
-            default:
-              errno = EINVAL;
-              break;
-          }
-        }
-        break;
+    case RTEMS_FDISK_IOCTL_COMPACT:
+      errno = rtems_fdisk_compact (fd);
+      break;
 
-      case RTEMS_FDISK_IOCTL_ERASE_DISK:
-        errno = rtems_fdisk_erase_disk (&rtems_flashdisks[minor]);
-        break;
+    case RTEMS_FDISK_IOCTL_ERASE_USED:
+      errno = rtems_fdisk_erase_used (fd);
+      break;
 
-      case RTEMS_FDISK_IOCTL_COMPACT:
-        errno = rtems_fdisk_compact (&rtems_flashdisks[minor]);
-        break;
+    case RTEMS_FDISK_IOCTL_MONITORING:
+      errno = rtems_fdisk_monitoring_data (fd,
+                                           (rtems_fdisk_monitor_data*) argp);
+      break;
 
-      case RTEMS_FDISK_IOCTL_ERASE_USED:
-        errno = rtems_fdisk_erase_used (&rtems_flashdisks[minor]);
-        break;
+    case RTEMS_FDISK_IOCTL_INFO_LEVEL:
+      fd->info_level = (uintptr_t) argp;
+      break;
 
-      case RTEMS_FDISK_IOCTL_MONITORING:
-        errno = rtems_fdisk_monitoring_data (&rtems_flashdisks[minor],
-                                             (rtems_fdisk_monitor_data*) argp);
-        break;
+    case RTEMS_FDISK_IOCTL_PRINT_STATUS:
+      errno = rtems_fdisk_print_status (fd);
+      break;
 
-      case RTEMS_FDISK_IOCTL_INFO_LEVEL:
-        rtems_flashdisks[minor].info_level = (uintptr_t) argp;
-        break;
-
-      case RTEMS_FDISK_IOCTL_PRINT_STATUS:
-        errno = rtems_fdisk_print_status (&rtems_flashdisks[minor]);
-        break;
-
-      default:
-        rtems_blkdev_ioctl (dd, req, argp);
-        break;
-    }
-
-    sc = rtems_semaphore_release (rtems_flashdisks[minor].lock);
-    if (sc != RTEMS_SUCCESSFUL)
-      errno = EIO;
+    default:
+      rtems_blkdev_ioctl (dd, req, argp);
+      break;
   }
+
+  rtems_mutex_unlock (&fd->lock);
 
   return errno == 0 ? 0 : -1;
 }
@@ -2463,35 +2444,26 @@ rtems_fdisk_ioctl (rtems_disk_device *dd, uint32_t req, void* argp)
 rtems_device_driver
 rtems_fdisk_initialize (rtems_device_major_number major,
                         rtems_device_minor_number minor,
-                        void*                     arg __attribute__((unused)))
+                        void*                     arg RTEMS_UNUSED)
 {
   const rtems_flashdisk_config* c = rtems_flashdisk_configuration;
   rtems_flashdisk*              fd;
   rtems_status_code             sc;
 
-  sc = rtems_disk_io_initialize ();
-  if (sc != RTEMS_SUCCESSFUL)
-    return sc;
-
   sc = rtems_fdisk_crc16_gen_factors (0x8408);
   if (sc != RTEMS_SUCCESSFUL)
       return sc;
 
-  rtems_flashdisks = calloc (rtems_flashdisk_configuration_size,
-                             sizeof (rtems_flashdisk));
-
-  if (!rtems_flashdisks)
+  fd = calloc (rtems_flashdisk_configuration_size, sizeof (*fd));
+  if (!fd)
     return RTEMS_NO_MEMORY;
 
-  for (minor = 0; minor < rtems_flashdisk_configuration_size; minor++, c++)
+  for (minor = 0; minor < rtems_flashdisk_configuration_size; minor++, c++, fd++)
   {
     char     name[] = RTEMS_FLASHDISK_DEVICE_BASE_NAME "a";
-    dev_t    dev = rtems_filesystem_make_dev_t (major, minor);
     uint32_t device;
     uint32_t blocks = 0;
     int      ret;
-
-    fd = &rtems_flashdisks[minor];
 
     name [sizeof(RTEMS_FLASHDISK_DEVICE_BASE_NAME)] += minor;
 
@@ -2525,25 +2497,13 @@ rtems_fdisk_initialize (rtems_device_major_number major,
     if (!fd->devices)
       return RTEMS_NO_MEMORY;
 
-    sc = rtems_semaphore_create (rtems_build_name ('F', 'D', 'S', 'K'), 1,
-                                 RTEMS_PRIORITY | RTEMS_BINARY_SEMAPHORE |
-                                 RTEMS_INHERIT_PRIORITY, 0, &fd->lock);
-    if (sc != RTEMS_SUCCESSFUL)
-    {
-      rtems_fdisk_error ("disk lock create failed");
-      free (fd->copy_buffer);
-      free (fd->blocks);
-      free (fd->devices);
-      return sc;
-    }
+    rtems_mutex_init (&fd->lock, "Flash Disk");
 
-    sc = rtems_disk_create_phys(dev, c->block_size,
-                                blocks - fd->unavail_blocks,
-                                rtems_fdisk_ioctl, NULL, name);
+    sc = rtems_blkdev_create(name, c->block_size, blocks - fd->unavail_blocks,
+                             rtems_fdisk_ioctl, fd);
     if (sc != RTEMS_SUCCESSFUL)
     {
-      rtems_semaphore_delete (fd->lock);
-      rtems_disk_delete (dev);
+      rtems_mutex_destroy (&fd->lock);
       free (fd->copy_buffer);
       free (fd->blocks);
       free (fd->devices);
@@ -2563,8 +2523,8 @@ rtems_fdisk_initialize (rtems_device_major_number major,
                                              sizeof (rtems_fdisk_segment_ctl));
       if (!fd->devices[device].segments)
       {
-        rtems_disk_delete (dev);
-        rtems_semaphore_delete (fd->lock);
+        unlink (name);
+        rtems_mutex_destroy (&fd->lock);
         free (fd->copy_buffer);
         free (fd->blocks);
         free (fd->devices);
@@ -2598,8 +2558,8 @@ rtems_fdisk_initialize (rtems_device_major_number major,
     ret = rtems_fdisk_recover_block_mappings (fd);
     if (ret)
     {
-      rtems_disk_delete (dev);
-      rtems_semaphore_delete (fd->lock);
+      unlink (name);
+      rtems_mutex_destroy (&fd->lock);
       free (fd->copy_buffer);
       free (fd->blocks);
       free (fd->devices);
@@ -2611,8 +2571,8 @@ rtems_fdisk_initialize (rtems_device_major_number major,
     ret = rtems_fdisk_compact (fd);
     if (ret)
     {
-      rtems_disk_delete (dev);
-      rtems_semaphore_delete (fd->lock);
+      unlink (name);
+      rtems_mutex_destroy (&fd->lock);
       free (fd->copy_buffer);
       free (fd->blocks);
       free (fd->devices);
@@ -2621,8 +2581,6 @@ rtems_fdisk_initialize (rtems_device_major_number major,
       return ret;
     }
   }
-
-  rtems_flashdisk_count = rtems_flashdisk_configuration_size;
 
   return RTEMS_SUCCESSFUL;
 }

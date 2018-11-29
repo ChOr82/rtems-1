@@ -7,10 +7,10 @@
  */
 
 /*
- * Copyright (c) 2009-2012 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2009, 2018 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
- *  Obere Lagerstr. 30
+ *  Dornierstr. 4
  *  82178 Puchheim
  *  Germany
  *  <rtems@embedded-brains.de>
@@ -33,10 +33,9 @@
 #include <rtems/ramdisk.h>
 #include <rtems/diskdevs.h>
 
-const char rtems_test_name[] = "BLOCK 1";
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
-/* forward declarations to avoid warnings */
-static rtems_task Init(rtems_task_argument argument);
+const char rtems_test_name[] = "BLOCK 1";
 
 #define ASSERT_SC(sc) rtems_test_assert((sc) == RTEMS_SUCCESSFUL)
 
@@ -45,6 +44,11 @@ static rtems_task Init(rtems_task_argument argument);
 #define BLOCK_SIZE 512U
 
 #define BLOCK_COUNT 16U
+
+static const rtems_driver_address_table ramdisk_ops = {
+  .initialization_entry = NULL,
+  RTEMS_GENERIC_BLOCK_DEVICE_DRIVER_ENTRIES
+};
 
 static void test_block_io_control_api(dev_t dev, ramdisk *rd)
 {
@@ -249,7 +253,7 @@ static rtems_task Init(rtems_task_argument argument)
 #define CONFIGURE_INIT
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
 
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4

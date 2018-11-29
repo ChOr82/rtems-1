@@ -47,8 +47,8 @@
 rtems_status_code rtems_partition_create(
   rtems_name       name,
   void            *starting_address,
-  uint32_t         length,
-  uint32_t         buffer_size,
+  uintptr_t        length,
+  size_t           buffer_size,
   rtems_attribute  attribute_set,
   rtems_id        *id
 )
@@ -64,12 +64,23 @@ rtems_status_code rtems_partition_create(
   if ( !id )
     return RTEMS_INVALID_ADDRESS;
 
-  if ( length == 0 || buffer_size == 0 || length < buffer_size ||
-         !_Partition_Is_buffer_size_aligned( buffer_size ) )
+  if ( length == 0 )
     return RTEMS_INVALID_SIZE;
 
-  if ( !_Addresses_Is_aligned( starting_address ) )
-     return RTEMS_INVALID_ADDRESS;
+  if ( buffer_size == 0 )
+    return RTEMS_INVALID_SIZE;
+
+  if ( length < buffer_size )
+    return RTEMS_INVALID_SIZE;
+
+  if ( !_Partition_Is_buffer_size_aligned( buffer_size ) )
+    return RTEMS_INVALID_SIZE;
+
+  if ( buffer_size < sizeof( Chain_Node ) )
+    return RTEMS_INVALID_SIZE;
+
+  if ( !_Partition_Is_buffer_area_aligned( starting_address ) )
+    return RTEMS_INVALID_ADDRESS;
 
 #if defined(RTEMS_MULTIPROCESSING)
   if ( _Attributes_Is_global( attribute_set ) &&
@@ -94,14 +105,13 @@ rtems_status_code rtems_partition_create(
   }
 #endif
 
-  the_partition->starting_address      = starting_address;
-  the_partition->length                = length;
-  the_partition->buffer_size           = buffer_size;
-  the_partition->attribute_set         = attribute_set;
-  the_partition->number_of_used_blocks = 0;
-
-  _Chain_Initialize( &the_partition->Memory, starting_address,
-                        length / buffer_size, buffer_size );
+  _Partition_Initialize(
+    the_partition,
+    starting_address,
+    length,
+    buffer_size,
+    attribute_set
+  );
 
   _Objects_Open(
     &_Partition_Information,

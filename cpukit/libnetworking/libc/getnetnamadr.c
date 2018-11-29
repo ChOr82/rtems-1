@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-user-space.h>
+
 /*-
  * Copyright (c) 1994, Garrett Wollman
  *
@@ -32,6 +34,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <rtems/rtems_netdb.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <errno.h>

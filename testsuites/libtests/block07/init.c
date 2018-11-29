@@ -7,12 +7,13 @@
  */
 
 /*
- * Copyright (c) 2009
- * embedded brains GmbH
- * Obere Lagerstr. 30
- * D-82178 Puchheim
- * Germany
- * <rtems@embedded-brains.de>
+ * Copyright (c) 2009, 2018 embedded brains GmbH.  All rights reserved.
+ *
+ *  embedded brains GmbH
+ *  Dornierstr. 4
+ *  82178 Puchheim
+ *  Germany
+ *  <rtems@embedded-brains.de>
  *
  * The license and distribution terms for this file may be
  * found in the file LICENSE in this distribution or at
@@ -27,17 +28,15 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
+
 #include "tmacros.h"
 
 #include <rtems.h>
 #include <rtems/ramdisk.h>
 #include <rtems/bdbuf.h>
-#include <rtems/diskdevs.h>
 
 const char rtems_test_name[] = "BLOCK 7";
-
-/* forward declarations to avoid warnings */
-static rtems_task Init(rtems_task_argument argument);
 
 #define ASSERT_SC(sc) rtems_test_assert((sc) == RTEMS_SUCCESSFUL)
 
@@ -86,23 +85,23 @@ static void task_low(rtems_task_argument arg)
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_bdbuf_buffer *bd = NULL;
 
-  printk("L: try access: 0\n");
+  printf("L: try access: 0\n");
 
   sc = rtems_bdbuf_get(dd, 0, &bd);
   ASSERT_SC(sc);
 
-  printk("L: access: 0\n");
+  printf("L: access: 0\n");
 
   rtems_test_assert(bd->group->bds_per_group == 2);
 
-  printk("L: release: 0\n");
+  printf("L: release: 0\n");
 
   sc = rtems_bdbuf_release(bd);
   ASSERT_SC(sc);
 
-  printk("L: release done: 0\n");
+  printf("L: release done: 0\n");
 
-  rtems_test_endk();
+  TEST_END();
 
   exit(0);
 }
@@ -112,23 +111,23 @@ static void task_mid(rtems_task_argument arg)
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_bdbuf_buffer *bd = NULL;
 
-  printk("M: try access: 0\n");
+  printf("M: try access: 0\n");
 
   sc = rtems_bdbuf_get(dd, 0, &bd);
   ASSERT_SC(sc);
 
-  printk("M: access: 0\n");
+  printf("M: access: 0\n");
 
   rtems_test_assert(bd->group->bds_per_group == 1);
 
-  printk("M: release: 0\n");
+  printf("M: release: 0\n");
 
   sc = rtems_bdbuf_release(bd);
   ASSERT_SC(sc);
 
-  printk("M: release done: 0\n");
+  printf("M: release done: 0\n");
 
-  rtems_task_delete(RTEMS_SELF);
+  rtems_task_exit();
 }
 
 static void task_high(rtems_task_argument arg)
@@ -138,23 +137,47 @@ static void task_high(rtems_task_argument arg)
 
   change_block_size();
 
-  printk("H: try access: 0\n");
+  printf("H: try access: 0\n");
 
   sc = rtems_bdbuf_get(dd, 0, &bd);
   ASSERT_SC(sc);
 
-  printk("H: access: 0\n");
+  printf("H: access: 0\n");
 
   rtems_test_assert(bd->group->bds_per_group == 1);
 
-  printk("H: release: 0\n");
+  printf("H: release: 0\n");
 
   sc = rtems_bdbuf_release(bd);
   ASSERT_SC(sc);
 
-  printk("H: release done: 0\n");
+  printf("H: release done: 0\n");
 
-  rtems_task_delete(RTEMS_SELF);
+  rtems_task_exit();
+}
+
+static void do_ramdisk_register(
+  uint32_t media_block_size,
+  rtems_blkdev_bnum media_block_count,
+  const char *disk,
+  rtems_disk_device **dd
+)
+{
+  rtems_status_code sc;
+  int fd;
+  int rv;
+
+  sc = ramdisk_register(media_block_size, media_block_count, false, disk);
+  ASSERT_SC(sc);
+
+  fd = open(disk, O_RDWR);
+  rtems_test_assert(fd >= 0);
+
+  rv = rtems_disk_fd_get_disk_device(fd, dd);
+  rtems_test_assert(rv == 0);
+
+  rv = close(fd);
+  rtems_test_assert(rv == 0);
 }
 
 static rtems_task Init(rtems_task_argument argument)
@@ -162,18 +185,10 @@ static rtems_task Init(rtems_task_argument argument)
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_task_priority cur_prio = 0;
   rtems_bdbuf_buffer *bd = NULL;
-  dev_t dev = 0;
 
-  rtems_test_begink();
+  TEST_BEGIN();
 
-  sc = rtems_disk_io_initialize();
-  ASSERT_SC(sc);
-
-  sc = ramdisk_register(BLOCK_SIZE_A, BLOCK_COUNT, false, "/dev/rda", &dev);
-  ASSERT_SC(sc);
-
-  dd = rtems_disk_obtain(dev);
-  rtems_test_assert(dd != NULL);
+  do_ramdisk_register(BLOCK_SIZE_A, BLOCK_COUNT, "/dev/rda", &dd);
 
   sc = rtems_task_create(
     rtems_build_name(' ', 'L', 'O', 'W'),
@@ -226,12 +241,12 @@ static rtems_task Init(rtems_task_argument argument)
   sc = rtems_bdbuf_release(bd);
   ASSERT_SC(sc);
 
-  printk("I: try access: 0\n");
+  printf("I: try access: 0\n");
 
   sc = rtems_bdbuf_get(dd, 0, &bd);
   ASSERT_SC(sc);
 
-  printk("I: access: 0\n");
+  printf("I: access: 0\n");
 
   sc = rtems_task_set_priority(RTEMS_SELF, PRIORITY_IDLE, &cur_prio);
   ASSERT_SC(sc);
@@ -245,26 +260,25 @@ static rtems_task Init(rtems_task_argument argument)
   sc = rtems_task_set_priority(RTEMS_SELF, PRIORITY_INIT, &cur_prio);
   ASSERT_SC(sc);
 
-  printk("I: release: 0\n");
+  printf("I: release: 0\n");
 
   sc = rtems_bdbuf_release(bd);
   ASSERT_SC(sc);
 
-  printk("I: release done: 0\n");
+  printf("I: release done: 0\n");
 
-  rtems_task_delete(RTEMS_SELF);
+  rtems_task_exit();
 }
 
 #define CONFIGURE_INIT
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
 
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4
 
 #define CONFIGURE_MAXIMUM_TASKS 4
-#define CONFIGURE_MAXIMUM_DRIVERS 2
 
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 

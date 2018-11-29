@@ -49,7 +49,7 @@ rtems_task Test_Thread( rtems_task_argument arg )
   rtems_test_assert( sc == 0 );
 
   puts( "Test_Thread - exit but don't run key destructors - OK" );
-  rtems_task_delete( RTEMS_SELF );
+  rtems_task_exit();
 }
 
 rtems_task Init( rtems_task_argument ignored )
@@ -98,7 +98,7 @@ rtems_task Init( rtems_task_argument ignored )
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION

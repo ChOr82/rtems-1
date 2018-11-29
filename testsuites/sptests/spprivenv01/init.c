@@ -36,7 +36,7 @@ rtems_task task_routine(rtems_task_argument not_used)
 
   sleep( 1 );
 
-  rtems_task_delete( RTEMS_SELF );
+  rtems_task_exit();
 }
 
 rtems_task Init(
@@ -90,7 +90,7 @@ rtems_task Init(
   sc = rtems_task_create( another_task_name,
 			  1,
 			  RTEMS_MINIMUM_STACK_SIZE * 2,
-			  RTEMS_INTERRUPT_LEVEL(31),
+			  RTEMS_DEFAULT_MODES,
 			  RTEMS_DEFAULT_ATTRIBUTES,
 			  &task_id
 			  );
@@ -115,7 +115,7 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS             3

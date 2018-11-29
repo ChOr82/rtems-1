@@ -16,8 +16,9 @@
   #include "config.h"
 #endif
 
+#include "tmacros.h"
+
 #include <rtems.h>
-#include <rtems/test.h>
 #include <rtems/score/smpimpl.h>
 
 #include <bsp.h>
@@ -33,15 +34,17 @@ const char rtems_test_name[] = "SMPFATAL 8";
  * without BSP support.
  */
 
-void bsp_start_on_secondary_processor(void)
+void bsp_start_on_secondary_processor(struct Per_CPU_Control *cpu_self)
 {
   /* Provided to avoid multiple definitions of the CPU SMP support functions */
+  (void) cpu_self;
 }
 
 #if QORIQ_THREAD_COUNT > 1
-void qoriq_start_thread(void)
+void qoriq_start_thread(Per_CPU_Control *cpu_self)
 {
   /* Provided to avoid multiple definitions of the CPU SMP support functions */
+  (void) cpu_self;
 }
 #endif
 
@@ -70,7 +73,8 @@ void _CPU_SMP_Prepare_start_multitasking(void)
 }
 
 #if defined(RTEMS_PARAVIRT) \
-  || (!defined(__leon__) && !defined(__PPC__) && !defined(__arm__))
+  || (!defined(__leon__) && !defined(__PPC__) \
+    && !defined(__arm__) && !defined(__riscv))
 uint32_t _CPU_SMP_Get_current_processor(void)
 {
   return 0;
@@ -89,42 +93,40 @@ static void Init(rtems_task_argument arg)
 
 static void fatal_extension(
   rtems_fatal_source source,
-  bool is_internal,
+  bool always_set_to_false,
   rtems_fatal_code code
 )
 {
-  rtems_test_begink();
+  TEST_BEGIN();
 
   if (
     source == RTEMS_FATAL_SOURCE_SMP
-      && !is_internal
+      && !always_set_to_false
       && code == SMP_FATAL_START_OF_MANDATORY_PROCESSOR_FAILED
   ) {
-    rtems_test_endk();
+    TEST_END();
   }
 }
 
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_INITIAL_EXTENSIONS \
   { .fatal = fatal_extension }, \
   RTEMS_TEST_INITIAL_EXTENSION
 
-#define CONFIGURE_SMP_APPLICATION
-
-#define CONFIGURE_SMP_MAXIMUM_PROCESSORS 2
+#define CONFIGURE_MAXIMUM_PROCESSORS 2
 
 #define CONFIGURE_SCHEDULER_SIMPLE_SMP
 
 #include <rtems/scheduler.h>
 
-RTEMS_SCHEDULER_CONTEXT_SIMPLE_SMP(a);
+RTEMS_SCHEDULER_SIMPLE_SMP(a);
 
-#define CONFIGURE_SCHEDULER_CONTROLS \
-  RTEMS_SCHEDULER_CONTROL_SIMPLE_SMP(a, rtems_build_name('S', 'I', 'M', 'P'))
+#define CONFIGURE_SCHEDULER_TABLE_ENTRIES \
+  RTEMS_SCHEDULER_TABLE_SIMPLE_SMP(a, rtems_build_name('S', 'I', 'M', 'P'))
 
-#define CONFIGURE_SMP_SCHEDULER_ASSIGNMENTS \
+#define CONFIGURE_SCHEDULER_ASSIGNMENTS \
   RTEMS_SCHEDULER_ASSIGN(0, RTEMS_SCHEDULER_ASSIGN_PROCESSOR_MANDATORY), \
   RTEMS_SCHEDULER_ASSIGN(0, RTEMS_SCHEDULER_ASSIGN_PROCESSOR_MANDATORY)
 

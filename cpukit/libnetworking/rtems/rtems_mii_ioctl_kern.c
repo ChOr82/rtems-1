@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 /* Simple (default) implementation for SIOCGIFMEDIA/SIOCSIFMEDIA
  * to be used by ethernet drivers [from their ioctl].
  *
@@ -55,6 +57,7 @@
 
 #include <rtems.h>
 #include <rtems/rtems_bsdnet.h>
+#include <sys/param.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>

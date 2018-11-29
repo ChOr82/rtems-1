@@ -6,10 +6,10 @@
  */
 
 /*
- * Copyright (c) 2012 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2012, 2018 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
- *  Obere Lagerstr. 30
+ *  Dornierstr. 4
  *  82178 Puchheim
  *  Germany
  *  <rtems@embedded-brains.de>
@@ -154,7 +154,7 @@ static ssize_t rtems_blkdev_imfs_write(
 
 static int rtems_blkdev_imfs_ioctl(
   rtems_libio_t *iop,
-  uint32_t request,
+  ioctl_command_t request,
   void *buffer
 )
 {
@@ -181,13 +181,18 @@ static int rtems_blkdev_imfs_fstat(
   struct stat *buf
 )
 {
-  rtems_blkdev_imfs_context *ctx =
-    IMFS_generic_get_context_by_location(loc);
-  rtems_disk_device *dd = &ctx->dd;
+  rtems_blkdev_imfs_context *ctx;
+  rtems_disk_device *dd;
+  IMFS_jnode_t *node;
 
-  buf->st_rdev = rtems_disk_get_device_identifier(dd);
+  ctx = IMFS_generic_get_context_by_location(loc);
+  dd = &ctx->dd;
+
   buf->st_blksize = rtems_disk_get_block_size(dd);
   buf->st_blocks = rtems_disk_get_block_count(dd);
+
+  node = loc->node_access;
+  buf->st_rdev = IMFS_generic_get_device_identifier_by_node(node);
 
   return IMFS_stat(loc, buf);
 }
@@ -222,6 +227,7 @@ static const rtems_filesystem_file_handlers_r rtems_blkdev_imfs_node = {
   .fdatasync_h = rtems_blkdev_imfs_fsync_or_fdatasync,
   .fcntl_h = rtems_filesystem_default_fcntl,
   .kqfilter_h = rtems_filesystem_default_kqfilter,
+  .mmap_h = rtems_filesystem_default_mmap,
   .poll_h = rtems_filesystem_default_poll,
   .readv_h = rtems_filesystem_default_readv,
   .writev_h = rtems_filesystem_default_writev
@@ -278,9 +284,15 @@ rtems_status_code rtems_blkdev_create(
   void *driver_data
 )
 {
-  rtems_status_code sc = RTEMS_SUCCESSFUL;
-  rtems_blkdev_imfs_context *ctx = malloc(sizeof(*ctx));
+  rtems_status_code sc;
+  rtems_blkdev_imfs_context *ctx;
 
+  sc = rtems_bdbuf_init();
+  if (sc != RTEMS_SUCCESSFUL) {
+    return RTEMS_INCORRECT_STATE;
+  }
+
+  ctx = malloc(sizeof(*ctx));
   if (ctx != NULL) {
     sc = rtems_disk_init_phys(
       &ctx->dd,

@@ -33,6 +33,7 @@
 /************************************/
 
 #include <unistd.h>
+#include <rtems/sysinit.h>
 #include <rtems/rtems/status.h>
 #include <rtems/rtems/types.h>
 #include <rtems/rtems/timer.h>
@@ -44,6 +45,8 @@
 
 #include <rtems/posix/timerimpl.h>
 
+Objects_Information _POSIX_Timer_Information;
+
 /*
  * _POSIX_Timer_Manager_initialization
  *
@@ -53,22 +56,23 @@
  *  the timers are stored
  */
 
-void _POSIX_Timer_Manager_initialization(void)
+static void _POSIX_Timer_Manager_initialization(void)
 {
   _Objects_Initialize_information(
     &_POSIX_Timer_Information,  /* object information table */
     OBJECTS_POSIX_API,          /* object API */
     OBJECTS_POSIX_TIMERS,       /* object class */
-    Configuration_POSIX_API.maximum_timers,
-                                /* maximum objects of this class */
+    _Configuration_POSIX_Maximum_timers,
     sizeof( POSIX_Timer_Control ),
                                 /* size of this object's control block */
-    true,                       /* true if names for this object are strings */
-    _POSIX_PATH_MAX             /* maximum length of each object's name */
-#if defined(RTEMS_MULTIPROCESSING)
-    ,
-    false,                      /* true if this is a global object class */
+    false,                      /* true if names for this object are strings */
+    0,                          /* maximum length of each object's name */
     NULL                        /* Proxy extraction support callout */
-#endif
   );
 }
+
+RTEMS_SYSINIT_ITEM(
+  _POSIX_Timer_Manager_initialization,
+  RTEMS_SYSINIT_POSIX_TIMER,
+  RTEMS_SYSINIT_ORDER_MIDDLE
+);

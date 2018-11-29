@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2015, 2016 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
  *  Dornierstr. 4
@@ -16,10 +16,9 @@
   #include "config.h"
 #endif
 
-#if HAVE_STRUCT__THREAD_QUEUE_QUEUE
-
 #include <sys/lock.h>
 #include <errno.h>
+#include <limits.h>
 
 #include <rtems/score/atomic.h>
 #include <rtems/score/chainimpl.h>
@@ -53,8 +52,8 @@ static Condition_Control *_Condition_Get(
 }
 
 static Thread_Control *_Condition_Queue_acquire_critical(
-  Condition_Control *condition,
-  ISR_lock_Context  *lock_context
+  Condition_Control    *condition,
+  Thread_queue_Context *queue_context
 )
 {
   Thread_Control *executing;
@@ -63,46 +62,87 @@ static Thread_Control *_Condition_Queue_acquire_critical(
   _Thread_queue_Queue_acquire_critical(
     &condition->Queue.Queue,
     &executing->Potpourri_stats,
-    lock_context
+    &queue_context->Lock_context.Lock_context
   );
 
   return executing;
 }
 
 static void _Condition_Queue_release(
-  Condition_Control *condition,
-  ISR_lock_Context  *lock_context
+  Condition_Control    *condition,
+  Thread_queue_Context *queue_context
 )
 {
-  _Thread_queue_Queue_release( &condition->Queue.Queue, lock_context );
+  _Thread_queue_Queue_release(
+    &condition->Queue.Queue,
+    &queue_context->Lock_context.Lock_context
+  );
 }
 
-static Per_CPU_Control *_Condition_Do_wait(
+typedef struct {
+  Thread_queue_Context   Base;
+  struct _Mutex_Control *mutex;
+} Condition_Enqueue_context;
+
+static void _Condition_Mutex_release( Thread_queue_Context *queue_context )
+{
+  Condition_Enqueue_context *context;
+
+  context = (Condition_Enqueue_context *) queue_context;
+  _Mutex_Release( context->mutex );
+}
+
+static void _Condition_Enqueue_no_timeout(
+  Thread_queue_Queue   *queue,
+  Thread_Control       *the_thread,
+  Per_CPU_Control      *cpu_self,
+  Thread_queue_Context *queue_context
+)
+{
+  _Condition_Mutex_release( queue_context );
+}
+
+static void _Condition_Enqueue_with_timeout(
+  Thread_queue_Queue   *queue,
+  Thread_Control       *the_thread,
+  Per_CPU_Control      *cpu_self,
+  Thread_queue_Context *queue_context
+)
+{
+  _Thread_queue_Add_timeout_realtime_timespec(
+    queue,
+    the_thread,
+    cpu_self,
+    queue_context
+  );
+  _Condition_Mutex_release( queue_context );
+}
+
+static Thread_Control *_Condition_Do_wait(
   struct _Condition_Control *_condition,
-  Watchdog_Interval          timeout,
-  ISR_lock_Context          *lock_context
+  struct _Mutex_Control     *_mutex,
+  Condition_Enqueue_context *context
 )
 {
   Condition_Control *condition;
   Thread_Control    *executing;
-  Per_CPU_Control   *cpu_self;
 
+  context->mutex = _mutex;
   condition = _Condition_Get( _condition );
-  executing = _Condition_Queue_acquire_critical( condition, lock_context );
-  cpu_self = _Thread_Dispatch_disable_critical( lock_context );
-
-  executing->Wait.return_code = 0;
-  _Thread_queue_Enqueue_critical(
+  _ISR_lock_ISR_disable( &context->Base.Lock_context.Lock_context );
+  executing = _Condition_Queue_acquire_critical( condition, &context->Base );
+  _Thread_queue_Context_set_thread_state(
+    &context->Base,
+    STATES_WAITING_FOR_CONDITION_VARIABLE
+  );
+  _Thread_queue_Enqueue(
     &condition->Queue.Queue,
     CONDITION_TQ_OPERATIONS,
     executing,
-    STATES_WAITING_FOR_SYS_LOCK_CONDITION,
-    timeout,
-    ETIMEDOUT,
-    lock_context
+    &context->Base
   );
 
-  return cpu_self;
+  return executing;
 }
 
 void _Condition_Wait(
@@ -110,14 +150,14 @@ void _Condition_Wait(
   struct _Mutex_Control     *_mutex
 )
 {
-  ISR_lock_Context  lock_context;
-  Per_CPU_Control  *cpu_self;
+  Condition_Enqueue_context context;
 
-  _ISR_lock_ISR_disable( &lock_context );
-  cpu_self = _Condition_Do_wait( _condition, 0, &lock_context );
-
-  _Mutex_Release( _mutex );
-  _Thread_Dispatch_enable( cpu_self );
+  _Thread_queue_Context_initialize( &context.Base );
+  _Thread_queue_Context_set_enqueue_callout(
+    &context.Base,
+    _Condition_Enqueue_no_timeout
+  );
+  _Condition_Do_wait( _condition, _mutex, &context );
   _Mutex_Acquire( _mutex );
 }
 
@@ -127,35 +167,33 @@ int _Condition_Wait_timed(
   const struct timespec     *abstime
 )
 {
-  ISR_lock_Context   lock_context;
-  Per_CPU_Control   *cpu_self;
-  Thread_Control    *executing;
-  int                eno;
-  Watchdog_Interval  ticks;
+  Condition_Enqueue_context  context;
+  Thread_Control            *executing;
+  int                        eno;
 
-  _ISR_lock_ISR_disable( &lock_context );
-
-  switch ( _TOD_Absolute_timeout_to_ticks( abstime, &ticks ) ) {
-    case TOD_ABSOLUTE_TIMEOUT_INVALID:
-      _ISR_lock_ISR_enable( &lock_context );
-      return EINVAL;
-    case TOD_ABSOLUTE_TIMEOUT_IS_IN_PAST:
-    case TOD_ABSOLUTE_TIMEOUT_IS_NOW:
-      _ISR_lock_ISR_enable( &lock_context );
-      return ETIMEDOUT;
-    default:
-      break;
-  }
-
-  cpu_self = _Condition_Do_wait( _condition, ticks, &lock_context );
-
-  _Mutex_Release( _mutex );
-  executing = cpu_self->executing;
-  _Thread_Dispatch_enable( cpu_self );
-  eno = (int) executing->Wait.return_code;
+  _Thread_queue_Context_initialize( &context.Base );
+  _Thread_queue_Context_set_enqueue_callout(
+    &context.Base,
+    _Condition_Enqueue_with_timeout
+  );
+  _Thread_queue_Context_set_timeout_argument( &context.Base, abstime );
+  executing = _Condition_Do_wait( _condition, _mutex, &context );
+  eno = STATUS_GET_POSIX( _Thread_Wait_get_status( executing ) );
   _Mutex_Acquire( _mutex );
 
   return eno;
+}
+
+static unsigned int _Condition_Unnest_mutex(
+  struct _Mutex_recursive_Control *_mutex
+)
+{
+  unsigned int nest_level;
+
+  nest_level = _mutex->_nest_level;
+  _mutex->_nest_level = 0;
+
+  return nest_level;
 }
 
 void _Condition_Wait_recursive(
@@ -163,17 +201,16 @@ void _Condition_Wait_recursive(
   struct _Mutex_recursive_Control *_mutex
 )
 {
-  ISR_lock_Context  lock_context;
-  Per_CPU_Control  *cpu_self;
-  unsigned int      nest_level;
+  Condition_Enqueue_context context;
+  unsigned int              nest_level;
 
-  _ISR_lock_ISR_disable( &lock_context );
-  cpu_self = _Condition_Do_wait( _condition, 0, &lock_context );
-
-  nest_level = _mutex->_nest_level;
-  _mutex->_nest_level = 0;
-  _Mutex_recursive_Release( _mutex );
-  _Thread_Dispatch_enable( cpu_self );
+  _Thread_queue_Context_initialize( &context.Base );
+  _Thread_queue_Context_set_enqueue_callout(
+    &context.Base,
+    _Condition_Enqueue_no_timeout
+  );
+  nest_level = _Condition_Unnest_mutex( _mutex );
+  _Condition_Do_wait( _condition, &_mutex->_Mutex, &context );
   _Mutex_recursive_Acquire( _mutex );
   _mutex->_nest_level = nest_level;
 }
@@ -184,116 +221,78 @@ int _Condition_Wait_recursive_timed(
   const struct timespec           *abstime
 )
 {
-  ISR_lock_Context   lock_context;
-  Per_CPU_Control   *cpu_self;
-  Thread_Control    *executing;
-  int                eno;
-  unsigned int       nest_level;
-  Watchdog_Interval  ticks;
+  Condition_Enqueue_context  context;
+  Thread_Control            *executing;
+  int                        eno;
+  unsigned int               nest_level;
 
-  _ISR_lock_ISR_disable( &lock_context );
-
-  switch ( _TOD_Absolute_timeout_to_ticks( abstime, &ticks ) ) {
-    case TOD_ABSOLUTE_TIMEOUT_INVALID:
-      _ISR_lock_ISR_enable( &lock_context );
-      return EINVAL;
-    case TOD_ABSOLUTE_TIMEOUT_IS_IN_PAST:
-    case TOD_ABSOLUTE_TIMEOUT_IS_NOW:
-      _ISR_lock_ISR_enable( &lock_context );
-      return ETIMEDOUT;
-    default:
-      break;
-  }
-
-  cpu_self = _Condition_Do_wait( _condition, ticks, &lock_context );
-
-  nest_level = _mutex->_nest_level;
-  _mutex->_nest_level = 0;
-  _Mutex_recursive_Release( _mutex );
-  executing = cpu_self->executing;
-  _Thread_Dispatch_enable( cpu_self );
-  eno = (int) executing->Wait.return_code;
+  _Thread_queue_Context_initialize( &context.Base );
+  _Thread_queue_Context_set_enqueue_callout(
+    &context.Base,
+    _Condition_Enqueue_with_timeout
+  );
+  _Thread_queue_Context_set_timeout_argument( &context.Base, abstime );
+  nest_level = _Condition_Unnest_mutex( _mutex );
+  executing = _Condition_Do_wait( _condition, &_mutex->_Mutex, &context );
+  eno = STATUS_GET_POSIX( _Thread_Wait_get_status( executing ) );
   _Mutex_recursive_Acquire( _mutex );
   _mutex->_nest_level = nest_level;
 
   return eno;
 }
 
-static int _Condition_Wake( struct _Condition_Control *_condition, int count )
+typedef struct {
+  Thread_queue_Context Base;
+  int                  count;
+} Condition_Flush_context;
+
+static Thread_Control *_Condition_Flush_filter(
+  Thread_Control       *the_thread,
+  Thread_queue_Queue   *queue,
+  Thread_queue_Context *queue_context
+)
 {
-  Condition_Control  *condition;
-  ISR_lock_Context    lock_context;
-  Thread_queue_Heads *heads;
-  Chain_Control       unblock;
-  Chain_Node         *node;
-  Chain_Node         *tail;
-  int                 woken;
+  Condition_Flush_context *context;
+
+  context = (Condition_Flush_context *) queue_context;
+
+  if ( context->count <= 0 ) {
+    return NULL;
+  }
+
+  --context->count;
+
+  return the_thread;
+}
+
+static void _Condition_Wake( struct _Condition_Control *_condition, int count )
+{
+  Condition_Control       *condition;
+  Condition_Flush_context  context;
 
   condition = _Condition_Get( _condition );
-  _ISR_lock_ISR_disable( &lock_context );
-  _Condition_Queue_acquire_critical( condition, &lock_context );
+  _Thread_queue_Context_initialize( &context.Base );
+  _ISR_lock_ISR_disable( &context.Base.Lock_context.Lock_context );
+  _Condition_Queue_acquire_critical( condition, &context.Base );
 
   /*
    * In common uses cases of condition variables there are normally no threads
    * on the queue, so check this condition early.
    */
-  heads = condition->Queue.Queue.heads;
-  if ( __predict_true( heads == NULL ) ) {
-    _Condition_Queue_release( condition, &lock_context );
-
-    return 0;
+  if (
+    RTEMS_PREDICT_TRUE( _Thread_queue_Is_empty( &condition->Queue.Queue ) )
+  ) {
+    _Condition_Queue_release( condition, &context.Base );
+    return;
   }
 
-  woken = 0;
-  _Chain_Initialize_empty( &unblock );
-  while ( count > 0 && heads != NULL ) {
-    const Thread_queue_Operations *operations;
-    Thread_Control                *first;
-    bool                           do_unblock;
-
-    operations = CONDITION_TQ_OPERATIONS;
-    first = ( *operations->first )( heads );
-
-    do_unblock = _Thread_queue_Extract_locked(
-      &condition->Queue.Queue,
-      operations,
-      first
-    );
-    if (do_unblock) {
-      _Chain_Append_unprotected( &unblock, &first->Wait.Node.Chain );
-    }
-
-    ++woken;
-    --count;
-    heads = condition->Queue.Queue.heads;
-  }
-
-  node = _Chain_First( &unblock );
-  tail = _Chain_Tail( &unblock );
-  if ( node != tail ) {
-    Per_CPU_Control *cpu_self;
-
-    cpu_self = _Thread_Dispatch_disable_critical( &lock_context );
-    _Condition_Queue_release( condition, &lock_context );
-
-    do {
-      Thread_Control *thread;
-      Chain_Node     *next;
-
-      next = _Chain_Next( node );
-      thread = THREAD_CHAIN_NODE_TO_THREAD( node );
-      _Watchdog_Remove_ticks( &thread->Timer );
-      _Thread_Unblock( thread );
-
-      node = next;
-    } while ( node != tail );
-
-    _Thread_Dispatch_enable( cpu_self );
-  } else {
-    _Condition_Queue_release( condition, &lock_context );
-  }
-
-  return woken;
+  context.count = count;
+  _Thread_queue_Flush_critical(
+    &condition->Queue.Queue,
+    CONDITION_TQ_OPERATIONS,
+    _Condition_Flush_filter,
+    &context.Base
+  );
 }
 
 void _Condition_Signal( struct _Condition_Control *_condition )
@@ -305,5 +304,3 @@ void _Condition_Broadcast( struct _Condition_Control *_condition )
 {
   _Condition_Wake( _condition, INT_MAX );
 }
-
-#endif /* HAVE_STRUCT__THREAD_QUEUE_QUEUE */

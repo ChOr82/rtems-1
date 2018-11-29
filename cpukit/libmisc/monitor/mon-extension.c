@@ -7,6 +7,7 @@
 #endif
 
 #include <rtems.h>
+#include <rtems/extensiondata.h>
 #include <rtems/monitor.h>
 
 #include <stdio.h>
@@ -41,7 +42,7 @@ rtems_monitor_extension_canonical(
 
 void
 rtems_monitor_extension_dump_header(
-    bool verbose __attribute__((unused))
+    bool verbose RTEMS_UNUSED
 )
 {
     fprintf(stdout,"\

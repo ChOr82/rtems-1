@@ -80,7 +80,7 @@ rtems_task Init(
       CONFIGURE_INIT_TASK_PRIORITY + (2*i),
       RTEMS_MINIMUM_STACK_SIZE,
       RTEMS_PREEMPT,
-      RTEMS_DEFAULT_ATTRIBUTES,
+      RTEMS_FLOATING_POINT,
       &id
     );
     directive_failed( status, "rtems_task_create" );
@@ -96,11 +96,11 @@ rtems_task Init(
 
   /* Create/Start an aditional task with the highest priority */
   status = rtems_task_create(
-    rtems_build_name( 'T', 'A', ch, ' ' ),
+    rtems_build_name( 'T', 'A', ch + 1, ' ' ),
     3,
     RTEMS_MINIMUM_STACK_SIZE,
     RTEMS_PREEMPT,
-    RTEMS_DEFAULT_ATTRIBUTES,
+    RTEMS_FLOATING_POINT,
     &id
   );
   directive_failed( status, "rtems_task_create" );

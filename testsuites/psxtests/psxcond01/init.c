@@ -51,6 +51,41 @@ void *BlockingThread(
   return NULL;
 }
 
+static void test_cond_auto_initialization( void )
+{
+  int eno;
+
+  {
+    pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+
+    eno = pthread_cond_destroy( &cond );
+    rtems_test_assert( eno == 0 );
+
+    eno = pthread_cond_destroy( &cond );
+    rtems_test_assert( eno == EINVAL );
+  }
+
+  {
+    pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+
+    eno = pthread_cond_signal( &cond );
+    rtems_test_assert( eno == 0 );
+
+    eno = pthread_cond_destroy( &cond );
+    rtems_test_assert( eno == 0 );
+  }
+
+  {
+    pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+
+    eno = pthread_cond_broadcast( &cond );
+    rtems_test_assert( eno == 0 );
+
+    eno = pthread_cond_destroy( &cond );
+    rtems_test_assert( eno == 0 );
+  }
+}
+
 void *POSIX_Init(
   void *argument
 )
@@ -59,6 +94,8 @@ void *POSIX_Init(
   pthread_t  Thread;
 
   TEST_BEGIN();
+
+  test_cond_auto_initialization();
 
   puts( "Init - pthread_mutex_init - Mutex1 - OK" );
   sc = pthread_mutex_init( &Mutex1, NULL );
@@ -89,14 +126,12 @@ void *POSIX_Init(
   return NULL; /* just so the compiler thinks we returned something */
 }
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_MAXIMUM_POSIX_THREADS 2
-#define CONFIGURE_MAXIMUM_POSIX_MUTEXES 2
-#define CONFIGURE_MAXIMUM_POSIX_CONDITION_VARIABLES 1
 
 #define CONFIGURE_POSIX_INIT_THREAD_TABLE
 

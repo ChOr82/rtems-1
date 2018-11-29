@@ -85,7 +85,7 @@ rtems_task read_task(rtems_task_argument not_used)
   puts("\nReader done!");
   status = rtems_barrier_wait( Barrier, RTEMS_NO_TIMEOUT );
   rtems_test_assert( status == RTEMS_SUCCESSFUL );
-  rtems_task_delete( RTEMS_SELF );
+  rtems_task_exit();
 }
 
 void test_main(void) /* Also acts as the write task */
@@ -202,7 +202,7 @@ rtems_task Init(
   rtems_test_exit(0);
 }
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 6
@@ -215,9 +215,9 @@ rtems_task Init(
 
 #define CONFIGURE_MAXIMUM_BARRIERS 1
 
-#define CONFIGURE_INIT
 #define CONFIGURE_MAXIMUM_FIFOS 1
 
+#define CONFIGURE_DISABLE_SMP_CONFIGURATION
 
 #define CONFIGURE_INIT
 #include <rtems/confdefs.h>

@@ -34,16 +34,13 @@ rtems_task Init(
   rtems_task_argument argument
 )
 {
-  rtems_status_code status;
-
   Print_Warning();
 
   TEST_BEGIN();
 
   test_init();
 
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
+  rtems_task_exit();
 }
 
 void test_init( void )
@@ -94,7 +91,7 @@ rtems_task Task_1(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_TASK_RESTART
+    0
   );
 
   for ( index=1 ; index <= OPERATION_COUNT ; index++ ) {
@@ -122,7 +119,7 @@ rtems_task Task_1(
     end_time,
     OPERATION_COUNT,
     0,
-    CALLING_OVERHEAD_TASK_SUSPEND
+    0
   );
 
   benchmark_timer_initialize();
@@ -135,7 +132,7 @@ rtems_task Task_1(
     end_time,
     OPERATION_COUNT,
     0,
-    CALLING_OVERHEAD_TASK_RESUME
+    0
   );
 
   benchmark_timer_initialize();
@@ -148,7 +145,7 @@ rtems_task Task_1(
     end_time,
     OPERATION_COUNT,
     0,
-    CALLING_OVERHEAD_TASK_RESUME
+    0
   );
 
   TEST_END();

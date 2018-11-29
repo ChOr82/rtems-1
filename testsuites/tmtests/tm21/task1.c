@@ -47,8 +47,7 @@ rtems_task Init(
   status = rtems_task_start( id, Task_1, 0 );
   directive_failed( status, "rtems_task_start of TASK1" );
 
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
+  rtems_task_exit();
 }
 
 rtems_task Task_1(
@@ -139,7 +138,7 @@ rtems_task Task_1(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_TASK_IDENT
+    0
   );
 
   benchmark_timer_initialize();
@@ -152,7 +151,7 @@ rtems_task Task_1(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_MESSAGE_QUEUE_IDENT
+    0
   );
 
   benchmark_timer_initialize();
@@ -165,7 +164,7 @@ rtems_task Task_1(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_SEMAPHORE_IDENT
+    0
   );
 
   benchmark_timer_initialize();
@@ -178,7 +177,7 @@ rtems_task Task_1(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_PARTITION_IDENT
+    0
   );
 
   benchmark_timer_initialize();
@@ -191,7 +190,7 @@ rtems_task Task_1(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_REGION_IDENT
+    0
   );
 
   benchmark_timer_initialize();
@@ -204,7 +203,7 @@ rtems_task Task_1(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_PORT_IDENT
+    0
   );
 
   benchmark_timer_initialize();
@@ -217,7 +216,7 @@ rtems_task Task_1(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_TIMER_IDENT
+    0
   );
 
   benchmark_timer_initialize();
@@ -230,7 +229,7 @@ rtems_task Task_1(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_RATE_MONOTONIC_IDENT
+    0
   );
 
   TEST_END();

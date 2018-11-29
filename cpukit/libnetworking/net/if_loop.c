@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 /*
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -52,7 +54,7 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <errno.h>
-#include <sys/ioctl.h>
+#include <sys/sockio.h>
 #include <sys/time.h>
 
 #include <net/if.h>

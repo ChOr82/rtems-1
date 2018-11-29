@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 #if HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -17,6 +19,8 @@
 #include <netinet/ip_var.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
+
+#include <rtems/rtems_bsdnet.h>
 
 /*
  * Display UDP statistics

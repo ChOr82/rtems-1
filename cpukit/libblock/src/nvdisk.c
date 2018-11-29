@@ -25,9 +25,9 @@
 #include <string.h>
 #include <inttypes.h>
 
-#include "rtems/blkdev.h"
-#include "rtems/diskdevs.h"
-#include "rtems/nvdisk.h"
+#include <rtems/blkdev.h>
+#include <rtems/nvdisk.h>
+#include <rtems/thread.h>
 
 /**
  * @note
@@ -92,29 +92,17 @@ typedef struct rtems_nvdisk_device_ctl
  * The NV disk control structure for a single disk. There is one
  * for each minor disk in the system.
  */
-typedef struct rtems_mvdisk
+typedef struct
 {
-  rtems_device_major_number major;        /**< The driver's major number. */
-  rtems_device_minor_number minor;        /**< The driver's minor number. */
   uint32_t                  flags;        /**< configuration flags. */
   uint32_t                  block_size;   /**< The block size for this disk. */
   uint32_t                  block_count;  /**< The number of available blocks. */
   rtems_nvdisk_device_ctl*  devices;      /**< The NV devices for this disk. */
   uint32_t                  device_count; /**< The number of NV devices. */
   uint32_t                  cs_pages;     /**< The num of pages of checksums. */
-  rtems_id                  lock;         /**< Mutex for threading protection.*/
+  rtems_mutex               lock;         /**< Mutex for threading protection.*/
   uint32_t info_level;                    /**< The info trace level. */
 } rtems_nvdisk;
-
-/**
- * The array of NV disks we support.
- */
-static rtems_nvdisk* rtems_nvdisks;
-
-/**
- * The number of NV disks we have.
- */
-static uint32_t rtems_nvdisk_count;
 
 /**
  * The CRC16 factor table. Created during initialisation.
@@ -687,18 +675,10 @@ rtems_nvdisk_erase_disk (rtems_nvdisk* nvd)
 static int
 rtems_nvdisk_ioctl (rtems_disk_device *dd, uint32_t req, void* argp)
 {
-  dev_t                     dev = rtems_disk_get_device_identifier (dd);
-  rtems_device_minor_number minor = rtems_filesystem_dev_minor_t (dev);
-  rtems_blkdev_request*     r = argp;
-  rtems_status_code         sc;
+  rtems_nvdisk*         nvd = rtems_disk_get_driver_data (dd);
+  rtems_blkdev_request* r = argp;
 
-  if (minor >= rtems_nvdisk_count)
-  {
-    errno = ENODEV;
-    return -1;
-  }
-
-  if (rtems_nvdisks[minor].device_count == 0)
+  if (nvd->device_count == 0)
   {
     errno = ENODEV;
     return -1;
@@ -706,48 +686,41 @@ rtems_nvdisk_ioctl (rtems_disk_device *dd, uint32_t req, void* argp)
 
   errno = 0;
 
-  sc = rtems_semaphore_obtain (rtems_nvdisks[minor].lock, RTEMS_WAIT, 0);
-  if (sc != RTEMS_SUCCESSFUL)
-    errno = EIO;
-  else
+  rtems_mutex_lock (&nvd->lock);
+
+  switch (req)
   {
-    errno = 0;
-    switch (req)
-    {
-      case RTEMS_BLKIO_REQUEST:
-        switch (r->req)
-        {
-          case RTEMS_BLKDEV_REQ_READ:
-            errno = rtems_nvdisk_read (&rtems_nvdisks[minor], r);
-            break;
+    case RTEMS_BLKIO_REQUEST:
+      switch (r->req)
+      {
+        case RTEMS_BLKDEV_REQ_READ:
+          errno = rtems_nvdisk_read (nvd, r);
+          break;
 
-          case RTEMS_BLKDEV_REQ_WRITE:
-            errno = rtems_nvdisk_write (&rtems_nvdisks[minor], r);
-            break;
+        case RTEMS_BLKDEV_REQ_WRITE:
+          errno = rtems_nvdisk_write (nvd, r);
+          break;
 
-          default:
-            errno = EINVAL;
-            break;
-        }
-        break;
+        default:
+          errno = EINVAL;
+          break;
+      }
+      break;
 
-      case RTEMS_NVDISK_IOCTL_ERASE_DISK:
-        errno = rtems_nvdisk_erase_disk (&rtems_nvdisks[minor]);
-        break;
+    case RTEMS_NVDISK_IOCTL_ERASE_DISK:
+      errno = rtems_nvdisk_erase_disk (nvd);
+      break;
 
-      case RTEMS_NVDISK_IOCTL_INFO_LEVEL:
-        rtems_nvdisks[minor].info_level = (uintptr_t) argp;
-        break;
+    case RTEMS_NVDISK_IOCTL_INFO_LEVEL:
+      nvd->info_level = (uintptr_t) argp;
+      break;
 
-      default:
-        rtems_blkdev_ioctl (dd, req, argp);
-        break;
-    }
-
-    sc = rtems_semaphore_release (rtems_nvdisks[minor].lock);
-    if (sc != RTEMS_SUCCESSFUL)
-      errno = EIO;
+    default:
+      rtems_blkdev_ioctl (dd, req, argp);
+      break;
   }
+
+  rtems_mutex_unlock (&nvd->lock);
 
   return errno == 0 ? 0 : -1;
 }
@@ -762,41 +735,31 @@ rtems_nvdisk_ioctl (rtems_disk_device *dd, uint32_t req, void* argp)
  * @param arg Initialization argument, not applicable.
  */
 rtems_device_driver
-rtems_nvdisk_initialize (rtems_device_major_number major,
-                        rtems_device_minor_number minor,
-                        void*                     arg __attribute__((unused)))
+rtems_nvdisk_initialize (rtems_device_major_number major RTEMS_UNUSED,
+                        rtems_device_minor_number minor RTEMS_UNUSED,
+                        void*                     arg RTEMS_UNUSED)
 {
   const rtems_nvdisk_config* c = rtems_nvdisk_configuration;
   rtems_nvdisk*              nvd;
   rtems_status_code          sc;
-
-  sc = rtems_disk_io_initialize ();
-  if (sc != RTEMS_SUCCESSFUL)
-    return sc;
+  uint32_t                   i;
 
   sc = rtems_nvdisk_crc16_gen_factors (0x8408);
   if (sc != RTEMS_SUCCESSFUL)
       return sc;
 
-  rtems_nvdisks = calloc (rtems_nvdisk_configuration_size,
-                          sizeof (rtems_nvdisk));
-
-  if (!rtems_nvdisks)
+  nvd = calloc (rtems_nvdisk_configuration_size, sizeof (*nvd));
+  if (!nvd)
     return RTEMS_NO_MEMORY;
 
-  for (minor = 0; minor < rtems_nvdisk_configuration_size; minor++, c++)
+  for (i = 0; i < rtems_nvdisk_configuration_size; i++, c++, nvd++)
   {
     char     name[] = RTEMS_NVDISK_DEVICE_BASE_NAME "a";
-    dev_t    dev = rtems_filesystem_make_dev_t (major, minor);
     uint32_t device;
     uint32_t blocks = 0;
 
-    nvd = &rtems_nvdisks[minor];
+    name [sizeof(RTEMS_NVDISK_DEVICE_BASE_NAME)] += i;
 
-    name [sizeof(RTEMS_NVDISK_DEVICE_BASE_NAME)] += minor;
-
-    nvd->major        = major;
-    nvd->minor        = minor;
     nvd->flags        = c->flags;
     nvd->block_size   = c->block_size;
     nvd->info_level   = c->info_level;
@@ -822,25 +785,16 @@ rtems_nvdisk_initialize (rtems_device_major_number major,
     nvd->block_count  = blocks;
     nvd->device_count = c->device_count;
 
-    sc = rtems_disk_create_phys(dev, c->block_size, blocks,
-                                rtems_nvdisk_ioctl, NULL, name);
+    sc = rtems_blkdev_create(name, c->block_size, blocks,
+                             rtems_nvdisk_ioctl, nvd);
     if (sc != RTEMS_SUCCESSFUL)
     {
       rtems_nvdisk_error ("disk create phy failed");
       return sc;
     }
 
-    sc = rtems_semaphore_create (rtems_build_name ('N', 'V', 'D', 'K'), 1,
-                                 RTEMS_PRIORITY | RTEMS_BINARY_SEMAPHORE |
-                                 RTEMS_INHERIT_PRIORITY, 0, &nvd->lock);
-    if (sc != RTEMS_SUCCESSFUL)
-    {
-      rtems_nvdisk_error ("disk lock create failed");
-      return sc;
-    }
+    rtems_mutex_init (&nvd->lock, "NV Disk");
   }
-
-  rtems_nvdisk_count = rtems_nvdisk_configuration_size;
 
   return RTEMS_SUCCESSFUL;
 }

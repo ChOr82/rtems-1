@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -120,7 +121,7 @@ rtems_task read_task(rtems_task_argument not_used)
   status = rtems_barrier_release( wBarrier, &released );
   rtems_test_assert( status == 0 );
 
-  rtems_task_delete( RTEMS_SELF );
+  rtems_task_exit();
 }
 
 rtems_task Init(
@@ -257,7 +258,7 @@ rtems_task Init(
   rtems_test_exit(0);
 }
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
 
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 6
@@ -270,9 +271,9 @@ rtems_task Init(
 
 #define CONFIGURE_MAXIMUM_BARRIERS 2
 
-#define CONFIGURE_INIT
 #define CONFIGURE_MAXIMUM_FIFOS 1
 
+#define CONFIGURE_DISABLE_SMP_CONFIGURATION
 
 #define CONFIGURE_INIT
 #include <rtems/confdefs.h>

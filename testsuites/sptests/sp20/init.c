@@ -28,13 +28,21 @@
 
 const char rtems_test_name[] = "SP 20";
 
+void end_of_test( void )
+{
+  TEST_END();
+  fsync(STDOUT_FILENO);
+  rtems_test_exit( 0 );
+}
+
 rtems_task Init(
   rtems_task_argument argument
 )
 {
-  uint32_t    index;
+  uint32_t          index;
   rtems_status_code status;
 
+  rtems_print_printer_fprintf(&rtems_test_printer, stdout);
   TEST_BEGIN();
 
   Task_name[ 1 ] =  rtems_build_name( 'T', 'A', '1', ' ' );
@@ -50,7 +58,7 @@ rtems_task Init(
       Priorities[ index ],
       RTEMS_MINIMUM_STACK_SIZE,
       RTEMS_DEFAULT_MODES,
-      RTEMS_DEFAULT_ATTRIBUTES,
+      RTEMS_FLOATING_POINT,
       &Task_id[ index ]
     );
     directive_failed( status, "rtems_task_create loop" );
@@ -68,6 +76,5 @@ rtems_task Init(
   Count.count[ 5 ] = 0;
   Count.count[ 6 ] = 0;
 
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
+  rtems_task_exit();
 }

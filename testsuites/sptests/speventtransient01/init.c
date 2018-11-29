@@ -37,8 +37,7 @@ static void server_task(rtems_task_argument arg)
   sc = rtems_event_transient_send(req->client);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-  sc = rtems_task_delete(RTEMS_SELF);
-  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+  rtems_task_exit();
 }
 
 static void test_with_request_server(void)
@@ -119,7 +118,7 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS 2
 

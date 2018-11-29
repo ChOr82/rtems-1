@@ -5,10 +5,12 @@ AC_INIT([rtems-c-src-tests-fstests],
         [_RTEMS_VERSION],[https://devel.rtems.org/newticket])
 AC_CONFIG_SRCDIR([imfs_support])
 RTEMS_TOP([../..],[..])
+RTEMS_SOURCE_TOP
+RTEMS_BUILD_TOP
 
 RTEMS_CANONICAL_TARGET_CPU
 
-AM_INIT_AUTOMAKE([no-define foreign 1.12.2])
+AM_INIT_AUTOMAKE([no-define foreign subdir-objects 1.12.2])
 AM_MAINTAINER_MODE
 
 RTEMS_ENV_RTEMSBSP
@@ -25,110 +27,63 @@ AC_CONFIG_HEADER([config.h])
 RTEMS_CHECK_CPUOPTS([RTEMS_POSIX_API])
 AM_CONDITIONAL(HAS_POSIX,test x"${rtems_cv_RTEMS_POSIX_API}" = x"yes")
 
-# but newlib doesn't have sys/mman.h
-AC_CHECK_HEADERS([sys/mman.h])
+# BSP Test configuration
+RTEMS_TEST_CHECK([fsbdpart01])
+RTEMS_TEST_CHECK([fsclose01])
+RTEMS_TEST_CHECK([fsdosfsformat01])
+RTEMS_TEST_CHECK([fsdosfsname01])
+RTEMS_TEST_CHECK([fsdosfsname02])
+RTEMS_TEST_CHECK([fsdosfssync01])
+RTEMS_TEST_CHECK([fsdosfswrite01])
+RTEMS_TEST_CHECK([fsfseeko01])
+RTEMS_TEST_CHECK([fsimfsconfig01])
+RTEMS_TEST_CHECK([fsimfsconfig02])
+RTEMS_TEST_CHECK([fsimfsconfig03])
+RTEMS_TEST_CHECK([fsimfsgeneric01])
+RTEMS_TEST_CHECK([fsjffs2gc01])
+RTEMS_TEST_CHECK([fsnofs01])
+RTEMS_TEST_CHECK([fsrfsbitmap01])
+RTEMS_TEST_CHECK([fsrofs01])
+RTEMS_TEST_CHECK([imfs_fserror])
+RTEMS_TEST_CHECK([imfs_fslink])
+RTEMS_TEST_CHECK([imfs_fspatheval])
+RTEMS_TEST_CHECK([imfs_fspermission])
+RTEMS_TEST_CHECK([imfs_fsrdwr])
+RTEMS_TEST_CHECK([imfs_fsscandir01])
+RTEMS_TEST_CHECK([imfs_fssymlink])
+RTEMS_TEST_CHECK([imfs_fstime])
+RTEMS_TEST_CHECK([jffs2_fserror])
+RTEMS_TEST_CHECK([jffs2_fslink])
+RTEMS_TEST_CHECK([jffs2_fspatheval])
+RTEMS_TEST_CHECK([jffs2_fspermission])
+RTEMS_TEST_CHECK([jffs2_fsrdwr])
+RTEMS_TEST_CHECK([jffs2_fsscandir01])
+RTEMS_TEST_CHECK([jffs2_fssymlink])
+RTEMS_TEST_CHECK([jffs2_fstime])
+RTEMS_TEST_CHECK([mdosfs_fserror])
+RTEMS_TEST_CHECK([mdosfs_fspatheval])
+RTEMS_TEST_CHECK([mdosfs_fsrdwr])
+RTEMS_TEST_CHECK([mdosfs_fsscandir01])
+RTEMS_TEST_CHECK([mdosfs_fsstatvfs])
+RTEMS_TEST_CHECK([mdosfs_fstime])
+RTEMS_TEST_CHECK([mimfs_fserror])
+RTEMS_TEST_CHECK([mimfs_fslink])
+RTEMS_TEST_CHECK([mimfs_fspatheval])
+RTEMS_TEST_CHECK([mimfs_fspermission])
+RTEMS_TEST_CHECK([mimfs_fsrdwr])
+RTEMS_TEST_CHECK([mimfs_fsrename])
+RTEMS_TEST_CHECK([mimfs_fsscandir01])
+RTEMS_TEST_CHECK([mimfs_fssymlink])
+RTEMS_TEST_CHECK([mimfs_fstime])
+RTEMS_TEST_CHECK([mrfs_fserror])
+RTEMS_TEST_CHECK([mrfs_fsfpathconf])
+RTEMS_TEST_CHECK([mrfs_fslink])
+RTEMS_TEST_CHECK([mrfs_fspatheval])
+RTEMS_TEST_CHECK([mrfs_fspermission])
+RTEMS_TEST_CHECK([mrfs_fsrdwr])
+RTEMS_TEST_CHECK([mrfs_fsscandir01])
+RTEMS_TEST_CHECK([mrfs_fssymlink])
+RTEMS_TEST_CHECK([mrfs_fstime])
 
-# FIXME: newlib should supply declaration of pthread_rwlock_unlock()
-AC_CHECK_DECLS([pthread_rwlock_unlock],[],[],[[#include <pthread.h>]])
-
-# FIXME: newlib should supply declaration of pthread_atfork()
-AC_CHECK_DECLS([pthread_atfork],[],[],[[#include <pthread.h>]])
-
-# FIXME: RTEMS presumes pthread_attr_getcputime to be IEEE Std 1003.1
-# Likely an anachronism in RTEMS.
-AC_CHECK_DECLS([pthread_attr_getcputime],[],[],[[#include <pthread.h>]])
-
-# FIXME: RTEMS presumes pthread_attr_getcputime to be IEEE Std 1003.1
-# Likely an anachronism in RTEMS.
-AC_CHECK_DECLS([pthread_attr_getcputime],[],[],[[#include <pthread.h>]])
-
-# FIXME: RTEMS presumes pthread_attr_setcputime to be IEEE Std 1003.1
-# Likely an anachronism in RTEMS.
-AC_CHECK_DECLS([pthread_attr_setcputime],[],[],[[#include <pthread.h>]])
-
-# Added to pthreads after initial revision.  May not be in toolset
-AC_CHECK_DECLS([pthread_attr_getstack],[],[],[[#include <pthread.h>]])
-
-# Added to pthreads after initial revision.  May not be in toolset
-AC_CHECK_DECLS([pthread_attr_setstack],[],[],[[#include <pthread.h>]])
-
-# Added to pthreads after initial revision.  May not be in toolset
-AC_CHECK_DECLS([pthread_attr_getguardsize],[],[],[[#include <pthread.h>]])
-
-# Added to pthreads after initial revision.  May not be in toolset
-AC_CHECK_DECLS([pthread_attr_setguardsize],[],[],[[#include <pthread.h>]])
-
-# FIXME: adjtime is a non-standardized BSD/Linux extension
-# RTEMS should not rely on adjtime
-AC_CHECK_DECLS([adjtime],[],[],[[#include <sys/time.h>]])
-
-# FIXME: IEEE Std 1003.1-2008 mandates mprotect in sys/mman.h,
-# RTEMS provides a stub, despite newlib doesn't have sys/mman.h
-AC_CHECK_DECLS([mprotect],[],[],[[#include <sys/mman.h>]])
-
-# FIXME: IEEE Std 1003.1-2008 mandates seteuid in unistd.h
-# RTEMS provides it, despite newlib doesn't declare it.
-AC_CHECK_DECLS([seteuid],[],[],[#include <unistd.h>])
-
-# FIXME: We should get rid of this. It's a cludge.
-AC_CHECK_SIZEOF([off_t])
-AC_CHECK_SIZEOF([blksize_t])
-AC_CHECK_SIZEOF([blkcnt_t])
-
-# Explicitly list all Makefiles here
-AC_CONFIG_FILES([Makefile
-fsimfsconfig03/Makefile
-fsimfsconfig02/Makefile
-fsimfsconfig01/Makefile
-fsdosfsname01/Makefile
-fsdosfswrite01/Makefile
-fsdosfsformat01/Makefile
-fsfseeko01/Makefile
-fsdosfssync01/Makefile
-imfs_fserror/Makefile
-imfs_fslink/Makefile
-imfs_fspatheval/Makefile
-imfs_fspermission/Makefile
-imfs_fsrdwr/Makefile
-imfs_fsscandir01/Makefile
-imfs_fssymlink/Makefile
-imfs_fstime/Makefile
-jffs2_fserror/Makefile
-jffs2_fslink/Makefile
-jffs2_fspatheval/Makefile
-jffs2_fspermission/Makefile
-jffs2_fsrdwr/Makefile
-jffs2_fsscandir01/Makefile
-jffs2_fssymlink/Makefile
-jffs2_fstime/Makefile
-mdosfs_fserror/Makefile
-mdosfs_fspatheval/Makefile
-mdosfs_fsrdwr/Makefile
-mdosfs_fsscandir01/Makefile
-mdosfs_fsstatvfs/Makefile
-mdosfs_fstime/Makefile
-mimfs_fserror/Makefile
-mimfs_fslink/Makefile
-mimfs_fspatheval/Makefile
-mimfs_fspermission/Makefile
-mimfs_fsrdwr/Makefile
-mimfs_fsscandir01/Makefile
-mimfs_fssymlink/Makefile
-mimfs_fstime/Makefile
-mimfs_fsrename/Makefile
-mrfs_fserror/Makefile
-mrfs_fslink/Makefile
-mrfs_fspatheval/Makefile
-mrfs_fspermission/Makefile
-mrfs_fsrdwr/Makefile
-mrfs_fsscandir01/Makefile
-mrfs_fssymlink/Makefile
-mrfs_fstime/Makefile
-mrfs_fsfpathconf/Makefile
-fsrfsbitmap01/Makefile
-fsnofs01/Makefile
-fsimfsgeneric01/Makefile
-fsbdpart01/Makefile
-
-])
+AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

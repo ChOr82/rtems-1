@@ -79,7 +79,6 @@
 #endif
 
 #define _KERNEL
-#define __BSD_VISIBLE	1
 
 #include <string.h>
 #include <stdarg.h>
@@ -104,6 +103,8 @@
 
 #include <net/if.h>
 #include <net/route.h>
+
+#include "nfsclient-private.h"
 
 struct socket *rtems_bsdnet_fdToSocket(int fd);
 

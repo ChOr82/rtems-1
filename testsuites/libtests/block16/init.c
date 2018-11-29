@@ -48,9 +48,6 @@ static void test(void)
   rtems_bdbuf_buffer *large_bd;
   rtems_blkdev_bnum i;
 
-  sc = rtems_disk_io_initialize();
-  ASSERT_SC(sc);
-
   for (i = 0; i < media_block_count; ++i) {
     buf [i] = i;
   }
@@ -135,7 +132,7 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
 
 #define CONFIGURE_BDBUF_BUFFER_MIN_SIZE 1

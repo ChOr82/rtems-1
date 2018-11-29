@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-user-space.h>
+
 /*
  * Copyright (c) 1985, 1993
  *    The Regents of the University of California.  All rights reserved.
@@ -77,6 +79,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "res_config.h"
 
 #define BIND_4_COMPAT
 

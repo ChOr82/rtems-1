@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-user-space.h>
+
 /*
  * Copyright (c) 1985, 1989, 1993
  *    The Regents of the University of California.  All rights reserved.
@@ -79,6 +81,9 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
+#ifndef NOSELECT
+#include <sys/select.h>
+#endif
 #include <sys/socket.h>
 #include <sys/uio.h>
 

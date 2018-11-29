@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 /*
   Description: Wrapper around DHCP client to restart it when the interface
                moves to another network.
@@ -63,7 +65,7 @@
 #include <rtems/rtems_dhcp_failsafe.h>
 
 struct  proc;                   /* Unused parameter of some functions. */
-#include <sys/ioctl.h>
+#include <sys/sockio.h>
 #include <sys/socket.h>
 #include <net/route.h>
 #include <netinet/in.h>         /* for sockaddr_in */
@@ -71,8 +73,6 @@ struct  proc;                   /* Unused parameter of some functions. */
 #include <net/if_var.h>         /* for in_var.h */
 #include <netinet/in_var.h>     /* for in_aliasreq */
 #include <sys/sockio.h>         /* for ioctl definitions */
-#include <arpa/inet.h>          /* for inet_addr, inet_ntop */
-
 
 static int network_fail_timeout = RTEMS_DHCP_FAILSAFE_NETWORK_FAIL_TIMEOUT;
 static int network_down_time = RTEMS_DHCP_FAILSAFE_NETWORK_DOWN_TIME;
@@ -326,7 +326,7 @@ static void dhcp_monitor_task (rtems_task_argument ifp_arg)
 
 error_out:
   printf("Stopping dhcp monitoring application.\n");
-  rtems_task_delete(RTEMS_SELF);
+  rtems_task_exit();
 }
 
 /*

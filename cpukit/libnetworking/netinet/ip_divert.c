@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 /*
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -53,6 +55,8 @@
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
+
+#ifdef IPDIVERT
 
 /*
  * Divert sockets
@@ -380,3 +384,4 @@ release:
 		m_freem(m);
 	return (error);
 }
+#endif /* IPDIVERT */

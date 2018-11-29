@@ -16,7 +16,9 @@
   #include "config.h"
 #endif
 
-#include "tmacros.h"
+#include <rtems/score/cpuimpl.h>
+
+#include <tmacros.h>
 
 const char rtems_test_name[] = "SPCONTEXT 1";
 
@@ -284,7 +286,7 @@ static void switch_extension(Thread_Control *executing, Thread_Control *heir)
 #define CONFIGURE_MICROSECONDS_PER_TICK 1000
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS 4
 #define CONFIGURE_MAXIMUM_TIMERS 1

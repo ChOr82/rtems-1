@@ -14,17 +14,14 @@
 #include <rtems.h>
 
 #if defined(RTEMS_NEWLIB)
-#include <rtems/libio.h>
-
 #include <stdio.h>
 #include <unistd.h>
 
 /* FIXME: These defines are a blatant hack */
 
   #if defined(__USE_INIT_FINI__)
-    #if defined(__m32r__)
-      #define FINI_SYMBOL __fini
-    #elif defined(__ARM_EABI__)
+    #if defined(__ARM_EABI__) || defined(__riscv) \
+      || defined(__or1k__) || defined(__or1knd__)
       #define FINI_SYMBOL __libc_fini_array
     #else
       #define FINI_SYMBOL _fini
@@ -43,7 +40,6 @@ void _exit(int status)
     FINI_SYMBOL();
   #endif
 
-  (*rtems_libio_exit_helper)();
   rtems_shutdown_executive(status);
   /* does not return */
 }

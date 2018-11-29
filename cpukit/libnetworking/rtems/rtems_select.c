@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 #if HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -17,6 +19,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/mbuf.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/protosw.h>

@@ -62,7 +62,6 @@ static char *rcsid = "$FreeBSD: src/lib/libc/xdr/xdr_float.c,v 1.7 1999/08/28 00
     defined(_AM29K) || \
     defined(__arm__) || \
     defined(__epiphany__) ||  defined(__EPIPHANY__) || \
-    defined(__H8300__) || defined(__h8300__) || \
     defined(__hppa__) || \
     defined(__i386__) || \
     defined(__lm32__) || \
@@ -73,12 +72,12 @@ static char *rcsid = "$FreeBSD: src/lib/libc/xdr/xdr_float.c,v 1.7 1999/08/28 00
     defined(__or1k__)  || defined(__or1knd__) || \
     defined(__sparc__) || \
     defined(__ppc__) || defined(__PPC__) || \
+    defined(__riscv) || \
     defined(__sh__) || \
-    defined(__AVR__) || \
     defined(__BFIN__) || \
     defined(__m32c__) || \
-    defined(__M32R__) || \
-    defined(__v850)
+    defined(__v850) || \
+    defined(__x86_64__)
 
 #include <rtems/endian.h>
 #if !defined(IEEEFP)

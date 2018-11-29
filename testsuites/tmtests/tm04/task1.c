@@ -43,16 +43,13 @@ rtems_task Init(
   rtems_task_argument argument
 )
 {
-  rtems_status_code status;
-
   Print_Warning();
 
   TEST_BEGIN();
 
   test_init();
 
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
+  rtems_task_exit();
 }
 
 void test_init(void)
@@ -104,7 +101,7 @@ rtems_task Highest_task(
       end_time,
       1,
       0,
-      CALLING_OVERHEAD_TASK_RESTART
+      0
     );
 
     status = rtems_task_set_priority(
@@ -123,12 +120,10 @@ rtems_task Highest_task(
       end_time,
       1,
       0,
-      CALLING_OVERHEAD_TASK_RESTART
+      0
     );
 
-    status = rtems_task_delete( RTEMS_SELF );
-    directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
-
+    rtems_task_exit();
   } else
     (void) rtems_semaphore_obtain(
       Semaphore_id,
@@ -170,7 +165,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     0,
-    CALLING_OVERHEAD_SEMAPHORE_RELEASE
+    0
   );
 
   name = rtems_build_name( 'T', 'I', 'M', 'E' );
@@ -197,7 +192,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_TASK_CREATE
+    0
   );
 
   benchmark_timer_initialize();
@@ -211,7 +206,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_TASK_START
+    0
   );
 
   for ( index=1 ; index <= OPERATION_COUNT ; index++ ) {
@@ -247,7 +242,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_TASK_RESTART
+    0
   );
 
   for ( index=1 ; index <= OPERATION_COUNT ; index++ )
@@ -263,7 +258,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_TASK_DELETE
+    0
   );
 
   for ( index=1 ; index <= OPERATION_COUNT ; index++ ) {
@@ -291,7 +286,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_TASK_RESTART
+    0
   );
 
   for ( index=1 ; index <= OPERATION_COUNT ; index++ ) {
@@ -313,7 +308,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_TASK_RESTART
+    0
   );
 
   /* yield processor -- tasks block */
@@ -330,7 +325,7 @@ rtems_task High_task(
     end_time,
     OPERATION_COUNT,
     overhead,
-    CALLING_OVERHEAD_TASK_DELETE
+    0
   );
 
   TEST_END();

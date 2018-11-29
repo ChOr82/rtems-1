@@ -28,12 +28,15 @@
 /* FIXME: This approach is questionable */
 static uint16_t rtems_pipe_no = 0;
 
-int pipe_create(
+int pipe(
   int filsdes[2]
 )
 {
   rtems_libio_t *iop;
   int err = 0;
+
+  if (filsdes == NULL)
+    rtems_set_errno_and_return_minus_one( EFAULT );
 
   if (rtems_mkdir("/tmp", S_IRWXU | S_IRWXG | S_IRWXO) != 0)
     return -1;
@@ -64,7 +67,7 @@ int pipe_create(
   else {
   /* Reset open file to blocking mode */
     iop = rtems_libio_iop(filsdes[0]);
-    iop->flags &= ~LIBIO_FLAGS_NO_DELAY;
+    rtems_libio_iop_flags_clear( iop, LIBIO_FLAGS_NO_DELAY );
 
     filsdes[1] = open(fifopath, O_WRONLY);
 

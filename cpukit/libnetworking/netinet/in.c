@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 /*
  * Copyright (c) 1982, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -37,7 +39,7 @@
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/systm.h>
-#include <sys/ioctl.h>
+#include <sys/sockio.h>
 #include <errno.h>
 #include <sys/malloc.h>
 #include <sys/socket.h>

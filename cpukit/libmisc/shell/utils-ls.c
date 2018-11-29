@@ -51,13 +51,13 @@ __RCSID("$NetBSD: util.c,v 1.28 2005/06/17 14:36:16 hira Exp $");
 #include <sys/stat.h>
 
 #include <ctype.h>
-#include <err.h>
-#include <fts.h>
+#include "err.h"
+#include "fts.h"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <vis.h>
+#include "vis.h"
 
 #include "extern-ls.h"
 
@@ -92,7 +92,7 @@ safe_print(rtems_shell_ls_globals* globals, const char *src)
 }
 
 int
-printescaped(rtems_shell_ls_globals* globals __attribute__((unused)), const char *src)
+printescaped(rtems_shell_ls_globals* globals RTEMS_UNUSED, const char *src)
 {
 	unsigned char c;
 	int n;

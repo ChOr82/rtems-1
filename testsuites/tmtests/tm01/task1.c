@@ -47,9 +47,7 @@ rtems_task Init(
   status = rtems_task_start( Task_id[ 1 ], Test_task, 0 );
   directive_failed( status, "rtems_task_start of TA1" );
 
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
-
+  rtems_task_exit();
 }
 
 rtems_task Test_task(
@@ -92,7 +90,7 @@ rtems_task Test_task(
     end_time,
     1,
     0,
-    CALLING_OVERHEAD_SEMAPHORE_CREATE
+    0
   );
 
   /* Time one invocation of rtems_semaphore_delete */
@@ -105,7 +103,7 @@ rtems_task Test_task(
     end_time,
     1,
     0,
-    CALLING_OVERHEAD_SEMAPHORE_CREATE
+    0
   );
 
   status = rtems_semaphore_create(
@@ -168,7 +166,7 @@ rtems_task Test_task(
     semaphore_obtain_time,
     OPERATION_COUNT * OPERATION_COUNT,
     semaphore_obtain_loop_time,
-    CALLING_OVERHEAD_SEMAPHORE_OBTAIN
+    0
   );
 
   put_time(
@@ -176,7 +174,7 @@ rtems_task Test_task(
     semaphore_obtain_no_wait_time,
     OPERATION_COUNT * OPERATION_COUNT,
     semaphore_obtain_loop_time,
-    CALLING_OVERHEAD_SEMAPHORE_OBTAIN
+    0
   );
 
   put_time(
@@ -184,7 +182,7 @@ rtems_task Test_task(
     semaphore_release_time,
     OPERATION_COUNT * OPERATION_COUNT * 2,
     semaphore_release_loop_time * 2,
-    CALLING_OVERHEAD_SEMAPHORE_RELEASE
+    0
   );
 
   TEST_END();

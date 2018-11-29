@@ -29,6 +29,7 @@
 #include <rtems/dosfs.h>
 #include <rtems/ramdisk.h>
 #include <rtems/libcsupport.h>
+#include <rtems/userenv.h>
 #include "image.h"
 #include "image_bin_le_singlebyte.h"
 #include "image_bin_le_multibyte.h"
@@ -46,11 +47,12 @@ const char rtems_test_name[] = "FSDOSFSNAME 1";
 #define RAMDISK_PATH "/dev/rda"
 #define BLOCK_NUM 47
 #define BLOCK_SIZE 512
+#define VOLUME_LABEL "MyDisk"
 
 #define NUMBER_OF_DIRECTORIES 8
 #define NUMBER_OF_FILES 13
 #define NUMBER_OF_DIRECTORIES_INVALID 25
-#define NUMBER_OF_DIRECTORIES_DUPLICATED 2
+#define NUMBER_OF_DIRECTORIES_DUPLICATED 3
 #define NUMBER_OF_MULTIBYTE_NAMES_DUPLICATED 2
 #define NUMBER_OF_FILES_DUPLICATED 2
 #define NUMBER_OF_NAMES_MULTIBYTE 10
@@ -62,23 +64,11 @@ static const char UTF8_BOM[] = {0xEF, 0xBB, 0xBF};
 
 #define BLOCK_SIZE 512
 
-#define BLOCK_COUNT ( sizeof( image_bin ) / BLOCK_SIZE )
-
-static ramdisk                            disk_image = {
-  .block_size             = BLOCK_SIZE,
-  .block_num              = BLOCK_COUNT,
-  .area                   = &image_bin[0],
-  .initialized            = true,
-  .malloced               = false,
-  .trace                  = false,
-  .free_at_delete_request = false
-};
-
 static rtems_resource_snapshot            before_mount;
 
 static const msdos_format_request_param_t rqdata = {
   .OEMName             = "RTEMS",
-  .VolLabel            = "RTEMSDisk",
+  .VolLabel            = VOLUME_LABEL,
   .sectors_per_cluster = 2,
   .fat_num             = 0,
   .files_per_root_dir  = 0,
@@ -190,6 +180,15 @@ static const name_duplicates DIRECTORY_DUPLICATES[
       "shrtdir",
       "SHRTDIR",
       "Shrtdir"
+    }
+  },
+  {
+    "Kurzdir",
+    3,
+    {
+      "kurzdir",
+      "KURZDIR",
+      "Kurzdir"
     }
   },
   {
@@ -971,11 +970,8 @@ static void compare_image(
 static void test_compatibility( void )
 {
   int                       rc;
-  rtems_status_code         sc;
-  dev_t                     dev;
-  char                      diskpath[] = "/dev/ramdisk1";
+  char                      diskpath[] = "/dev/rdd";
   rtems_dosfs_mount_options mount_opts;
-  rtems_device_major_number major;
   FILE                     *fp;
   int                       buffer;
   unsigned int              index_file = 0;
@@ -991,20 +987,6 @@ static void test_compatibility( void )
 
   mount_opts.converter = rtems_dosfs_create_utf8_converter( "CP850" );
   rtems_test_assert( mount_opts.converter != NULL );
-
-  sc = rtems_io_register_driver( 0, &ramdisk_ops, &major );
-  rtems_test_assert( sc == RTEMS_SUCCESSFUL );
-
-  dev = rtems_filesystem_make_dev_t( major, 1 );
-
-  sc  = rtems_disk_create_phys(
-    dev,
-    BLOCK_SIZE,
-    BLOCK_COUNT,
-    ramdisk_ioctl,
-    &disk_image,
-    diskpath );
-  rtems_test_assert( sc == RTEMS_SUCCESSFUL );
 
   rc = mount_and_make_target_path(
     diskpath,
@@ -1071,6 +1053,145 @@ static void test_compatibility( void )
   rtems_test_assert( rc == 0 );
 }
 
+static void test_end_of_string_matches( void )
+{
+  int rc;
+
+  rc = mkdir( MOUNT_DIR "/lib.beam", S_IRWXU | S_IRWXG | S_IRWXO );
+  rtems_test_assert( rc == 0 );
+
+  errno = 0;
+  rc = unlink( MOUNT_DIR "/proc_lib.beam" );
+  rtems_test_assert( rc == -1 );
+  rtems_test_assert( errno == ENOENT );
+
+  rc = unlink( MOUNT_DIR "/lib.beam" );
+  rtems_test_assert( rc == 0 );
+}
+
+static void test_end_of_string_matches_2( void )
+{
+  int rc;
+  int fd;
+
+  fd = open( MOUNT_DIR "/ets.beam", O_RDWR | O_CREAT,
+             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH );
+  rtems_test_assert( fd >= 0 );
+  rc = close( fd );
+  rtems_test_assert( rc == 0 );
+
+  fd = open( MOUNT_DIR "/sets.beam", O_RDWR | O_CREAT,
+             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH );
+  rtems_test_assert( fd >= 0 );
+  rc = close( fd );
+  rtems_test_assert( rc == 0 );
+
+  rc = unlink( MOUNT_DIR "/sets.beam" );
+  rtems_test_assert( rc == 0 );
+
+  rc = unlink( MOUNT_DIR "/ets.beam" );
+  rtems_test_assert( rc == 0 );
+}
+
+static void test_full_8_3_name( void )
+{
+  int rc;
+
+  rc = mkdir( MOUNT_DIR "/txtvsbin.txt", S_IRWXU | S_IRWXG | S_IRWXO );
+  rtems_test_assert( rc == 0 );
+
+  rc = unlink( MOUNT_DIR "/txtvsbin.txt" );
+  rtems_test_assert( rc == 0 );
+}
+
+static void test_dir_with_same_name_as_volume_label( void )
+{
+  int  rc;
+  DIR *dirp;
+
+  rc = mkdir( MOUNT_DIR "/" VOLUME_LABEL, S_IRWXU | S_IRWXG | S_IRWXO );
+  rtems_test_assert( rc == 0 );
+
+  dirp = opendir( MOUNT_DIR "/" VOLUME_LABEL );
+  rtems_test_assert( NULL != dirp );
+
+  rc = closedir( dirp );
+  rtems_test_assert( rc == 0 );
+
+  rc = unlink( MOUNT_DIR "/" VOLUME_LABEL );
+  rtems_test_assert( rc == 0 );
+}
+
+static void test_file_with_same_name_as_volume_label( void )
+{
+  int rc;
+  int fd;
+
+  fd = open( MOUNT_DIR "/" VOLUME_LABEL, O_RDWR | O_CREAT,
+             S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH );
+  rtems_test_assert( fd >= 0 );
+
+  rc = close( fd );
+  rtems_test_assert( rc == 0 );
+
+  fd = open( MOUNT_DIR "/" VOLUME_LABEL, O_RDWR );
+  rtems_test_assert( fd >= 0 );
+
+  rc = close( fd );
+  rtems_test_assert( rc == 0 );
+
+  rc = unlink( MOUNT_DIR "/" VOLUME_LABEL );
+  rtems_test_assert( rc == 0 );
+}
+
+static void test_getcwd( void )
+{
+  const char *dir_path = MOUNT_DIR "/somedir";
+  char cwd_buf[128];
+  char *cwd;
+  int rc;
+  rtems_status_code sc;
+
+  sc = rtems_libio_set_private_env();
+  rtems_test_assert( sc == RTEMS_SUCCESSFUL );
+
+  cwd = getcwd( cwd_buf, sizeof( cwd_buf ) );
+  rtems_test_assert( cwd != NULL );
+  rtems_test_assert( strcmp( cwd, "/" ) == 0 );
+
+  rc = mkdir( dir_path, S_IRWXU | S_IRWXG | S_IRWXO );
+  rtems_test_assert( rc == 0 );
+
+  rc = chdir( dir_path );
+  rtems_test_assert( rc == 0 );
+
+  cwd = getcwd( cwd_buf, sizeof( cwd_buf ) );
+  rtems_test_assert( cwd != NULL );
+  rtems_test_assert( strcmp( cwd, dir_path ) == 0 );
+
+  rc = chdir( "/" );
+  rtems_test_assert( rc == 0 );
+
+  rc = unlink( dir_path );
+  rtems_test_assert( rc == 0 );
+
+  cwd = getcwd( cwd_buf, sizeof( cwd_buf ) );
+  rtems_test_assert( cwd != NULL );
+  rtems_test_assert( strcmp( cwd, "/" ) == 0 );
+
+  rtems_libio_use_global_env();
+}
+
+static void test_special_cases( void )
+{
+  test_end_of_string_matches();
+  test_end_of_string_matches_2();
+  test_full_8_3_name();
+  test_file_with_same_name_as_volume_label();
+  test_dir_with_same_name_as_volume_label();
+  test_getcwd();
+}
+
 /*
  * Main test method
  */
@@ -1128,6 +1249,8 @@ static void test( void )
     MOUNT_DIR,
     "/dev/rdb",
     NULL);
+
+  test_special_cases();
 
   rc = unmount( MOUNT_DIR );
   rtems_test_assert( rc == 0 );
@@ -1197,6 +1320,8 @@ static void test( void )
     "/dev/rdb",
     &mount_opts[1]);
 
+  test_special_cases();
+
   rc = unmount( MOUNT_DIR );
   rtems_test_assert( rc == 0 );
 
@@ -1260,6 +1385,8 @@ static void test( void )
     "/dev/rdc",
     &mount_opts[1]);
 
+  test_special_cases();
+
   rc = unmount( MOUNT_DIR );
   rtems_test_assert( rc == 0 );
 
@@ -1300,16 +1427,17 @@ static void Init( rtems_task_argument arg )
 rtems_ramdisk_config rtems_ramdisk_configuration [] = {
   { .block_size = BLOCK_SIZE, .block_num = BLOCK_NUM },
   { .block_size = BLOCK_SIZE, .block_num = BLOCK_NUM, .location = &IMAGE_BIN_LE_SINGLEBYTE[0] },
-  { .block_size = BLOCK_SIZE, .block_num = BLOCK_NUM, .location = &IMAGE_BIN_LE_MULTIBYTE[0] }
+  { .block_size = BLOCK_SIZE, .block_num = BLOCK_NUM, .location = &IMAGE_BIN_LE_MULTIBYTE[0] },
+  { .block_size = BLOCK_SIZE, .block_num = sizeof( image_bin ) / BLOCK_SIZE, .location = image_bin }
 };
 
 size_t rtems_ramdisk_configuration_size = RTEMS_ARRAY_SIZE(rtems_ramdisk_configuration);
 
 #define CONFIGURE_INIT_TASK_STACK_SIZE ( 1024 * 64 )
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
-#define CONFIGURE_MAXIMUM_DRIVERS 4
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_MAXIMUM_SEMAPHORES (2 * RTEMS_DOSFS_SEMAPHORES_PER_INSTANCE)
+#define CONFIGURE_MAXIMUM_POSIX_KEY_VALUE_PAIRS 2
 #define CONFIGURE_APPLICATION_EXTRA_DRIVERS RAMDISK_DRIVER_TABLE_ENTRY
 
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
@@ -1325,6 +1453,8 @@ size_t rtems_ramdisk_configuration_size = RTEMS_ARRAY_SIZE(rtems_ramdisk_configu
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
+
+#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 
 #define CONFIGURE_INIT
 

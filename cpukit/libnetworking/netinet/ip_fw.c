@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 /*
  * Copyright (c) 1996 Alex Nash
  * Copyright (c) 1993 Daniel Boulet
@@ -35,8 +37,10 @@
 #include <sys/time.h>
 #include <sys/sysctl.h>
 #include <net/if.h>
+#include <net/if_var.h>
 #include <net/route.h>
 #include <netinet/in.h>
+#include <rtems/rtems_netinet_in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
@@ -47,6 +51,7 @@
 #include <netinet/tcp_var.h>
 #include <netinet/tcpip.h>
 #include <netinet/udp.h>
+#include <inttypes.h>
 
 static int fw_debug = 1;
 #ifdef IPFIREWALL_VERBOSE

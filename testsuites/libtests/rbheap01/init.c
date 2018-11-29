@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2012 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2012-2015 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
- *  Obere Lagerstr. 30
+ *  Dornierstr. 4
  *  82178 Puchheim
  *  Germany
  *  <rtems@embedded-brains.de>
@@ -28,13 +28,13 @@ const char rtems_test_name[] = "RBHEAP 1";
 /* forward declarations to avoid warnings */
 static rtems_task Init(rtems_task_argument argument);
 
-#define PAGE_SIZE 1024
+#define TEST_PAGE_SIZE 1024
 
-#define PAGE_COUNT 8
+#define TEST_PAGE_COUNT 8
 
-static char area [PAGE_SIZE * PAGE_COUNT + PAGE_SIZE - 1];
+static char area [TEST_PAGE_SIZE * TEST_PAGE_COUNT + TEST_PAGE_SIZE - 1];
 
-static rtems_rbheap_chunk chunks [PAGE_COUNT];
+static rtems_rbheap_chunk chunks [TEST_PAGE_COUNT];
 
 static void extend_descriptors(rtems_rbheap_control *control)
 {
@@ -49,7 +49,7 @@ static void extend_descriptors(rtems_rbheap_control *control)
   rtems_chain_initialize(
     chain,
     chunks,
-    PAGE_COUNT,
+    TEST_PAGE_COUNT,
     sizeof(chunks [0])
   );
 }
@@ -57,39 +57,40 @@ static void extend_descriptors(rtems_rbheap_control *control)
 static uintptr_t idx(const rtems_rbheap_chunk *chunk)
 {
   uintptr_t base = (uintptr_t) area;
-  uintptr_t excess = base % PAGE_SIZE;
+  uintptr_t excess = base % TEST_PAGE_SIZE;
 
   if (excess > 0) {
-    base += PAGE_SIZE - excess;
+    base += TEST_PAGE_SIZE - excess;
   }
 
-  return (chunk->begin - base) / PAGE_SIZE;
+  return (chunk->begin - base) / TEST_PAGE_SIZE;
 }
 
 typedef struct {
-  const uintptr_t *index_current;
-  const uintptr_t *index_end;
-  const bool *free_current;
-  const bool *free_end;
+  uintptr_t index;
+  bool free;
+} chunk_descriptor;
+
+typedef struct {
+  const chunk_descriptor *chunk_current;
+  const chunk_descriptor *chunk_end;
 } chunk_visitor_context;
 
 static bool chunk_visitor(
   const RBTree_Node *node,
-  RBTree_Direction dir,
   void *visitor_arg
 )
 {
   rtems_rbheap_chunk *chunk = rtems_rbheap_chunk_of_node(node);
   chunk_visitor_context *context = visitor_arg;
+  const chunk_descriptor *current = context->chunk_current;
 
-  rtems_test_assert(context->index_current != context->index_end);
-  rtems_test_assert(context->free_current != context->free_end);
+  rtems_test_assert(current != context->chunk_end);
 
-  rtems_test_assert(idx(chunk) == *context->index_current);
-  rtems_test_assert(rtems_rbheap_is_chunk_free(chunk) == *context->free_current);
+  rtems_test_assert(idx(chunk) == current->index);
+  rtems_test_assert(rtems_rbheap_is_chunk_free(chunk) == current->free);
 
-  ++context->index_current;
-  ++context->free_current;
+  context->chunk_current = current + 1;
 
   return false;
 }
@@ -101,9 +102,9 @@ static void test_init_begin_greater_than_end(void)
 
   sc = rtems_rbheap_initialize(
     &control,
-    (void *) PAGE_SIZE,
-    (uintptr_t) -PAGE_SIZE,
-    PAGE_SIZE,
+    (void *) TEST_PAGE_SIZE,
+    (uintptr_t) -TEST_PAGE_SIZE,
+    TEST_PAGE_SIZE,
     extend_descriptors,
     NULL
   );
@@ -117,9 +118,9 @@ static void test_init_begin_greater_than_aligned_begin(void)
 
   sc = rtems_rbheap_initialize(
     &control,
-    (void *) -(PAGE_SIZE / 2),
-    PAGE_SIZE,
-    PAGE_SIZE,
+    (void *) -(TEST_PAGE_SIZE / 2),
+    TEST_PAGE_SIZE,
+    TEST_PAGE_SIZE,
     extend_descriptors,
     NULL
   );
@@ -133,9 +134,9 @@ static void test_init_aligned_begin_greater_than_aligned_end(void)
 
   sc = rtems_rbheap_initialize(
     &control,
-    (void *) PAGE_SIZE,
-    PAGE_SIZE / 2,
-    PAGE_SIZE,
+    (void *) TEST_PAGE_SIZE,
+    TEST_PAGE_SIZE / 2,
+    TEST_PAGE_SIZE,
     extend_descriptors,
     NULL
   );
@@ -149,9 +150,9 @@ static void test_init_empty_descriptors(void)
 
   sc = rtems_rbheap_initialize(
     &control,
-    (void *) PAGE_SIZE,
-    PAGE_SIZE,
-    PAGE_SIZE,
+    (void *) TEST_PAGE_SIZE,
+    TEST_PAGE_SIZE,
+    TEST_PAGE_SIZE,
     rtems_rbheap_extend_descriptors_never,
     NULL
   );
@@ -160,43 +161,38 @@ static void test_init_empty_descriptors(void)
 
 static void test_chunk_tree(
   const rtems_rbheap_control *control,
-  const uintptr_t *index_begin,
-  const uintptr_t *index_end,
-  const bool *free_begin,
-  const bool *free_end
+  const chunk_descriptor *chunk_begin,
+  size_t chunk_count
 )
 {
   chunk_visitor_context context = {
-    .index_current = index_begin,
-    .index_end = index_end,
-    .free_current = free_begin,
-    .free_end = free_end
+    .chunk_current = chunk_begin,
+    .chunk_end = chunk_begin + chunk_count
   };
+
+  rtems_test_assert(
+    rtems_chain_node_count_unprotected(&control->spare_descriptor_chain)
+      == TEST_PAGE_COUNT - chunk_count
+  );
 
   _RBTree_Iterate(
     &control->chunk_tree,
-    RBT_RIGHT,
     chunk_visitor,
     &context
   );
 }
 
-#define TEST_PAGE_TREE(control, indices, frees) \
+#define TEST_PAGE_TREE(control, chunks) \
   test_chunk_tree( \
     control, \
-    indices, \
-    &indices [sizeof(indices) / sizeof(indices [0])], \
-    frees, \
-    &frees [sizeof(frees) / sizeof(frees [0])] \
+    chunks, \
+    RTEMS_ARRAY_SIZE(chunks) \
   )
 
 static void test_init_successful(rtems_rbheap_control *control)
 {
-  static const uintptr_t indices [] = {
-    0
-  };
-  static const bool frees [] = {
-    true
+  static const chunk_descriptor chunks [] = {
+    { 0, true }
   };
 
   rtems_status_code sc = RTEMS_SUCCESSFUL;
@@ -205,30 +201,23 @@ static void test_init_successful(rtems_rbheap_control *control)
     control,
     area,
     sizeof(area),
-    PAGE_SIZE,
+    TEST_PAGE_SIZE,
     extend_descriptors,
     NULL
   );
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-  TEST_PAGE_TREE(control, indices, frees);
+  TEST_PAGE_TREE(control, chunks);
 }
 
 static void test_alloc_and_free_one(void)
 {
-  static const uintptr_t indices_0 [] = {
-    0,
-    PAGE_COUNT - 1
+  static const chunk_descriptor chunks_0 [] = {
+    { 0, true },
+    { TEST_PAGE_COUNT - 1, false }
   };
-  static const bool frees_0 [] = {
-    true,
-    false
-  };
-  static const uintptr_t indices_1 [] = {
-    0
-  };
-  static const bool frees_1 [] = {
-    true,
+  static const chunk_descriptor chunks_1 [] = {
+    { 0, true }
   };
 
   rtems_status_code sc = RTEMS_SUCCESSFUL;
@@ -237,24 +226,21 @@ static void test_alloc_and_free_one(void)
 
   test_init_successful(&control);
 
-  ptr = rtems_rbheap_allocate(&control, PAGE_SIZE);
+  ptr = rtems_rbheap_allocate(&control, TEST_PAGE_SIZE);
   rtems_test_assert(ptr != NULL);
 
-  TEST_PAGE_TREE(&control, indices_0, frees_0);
+  TEST_PAGE_TREE(&control, chunks_0);
 
   sc = rtems_rbheap_free(&control, ptr);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-  TEST_PAGE_TREE(&control, indices_1, frees_1);
+  TEST_PAGE_TREE(&control, chunks_1);
 }
 
 static void test_alloc_zero(void)
 {
-  static const uintptr_t indices [] = {
-    0
-  };
-  static const bool frees [] = {
-    true
+  static const chunk_descriptor chunks [] = {
+    { 0, true }
   };
 
   rtems_rbheap_control control;
@@ -265,16 +251,13 @@ static void test_alloc_zero(void)
   ptr = rtems_rbheap_allocate(&control, 0);
   rtems_test_assert(ptr == NULL);
 
-  TEST_PAGE_TREE(&control, indices, frees);
+  TEST_PAGE_TREE(&control, chunks);
 }
 
 static void test_alloc_huge_chunk(void)
 {
-  static const uintptr_t indices [] = {
-    0
-  };
-  static const bool frees [] = {
-    true
+  static const chunk_descriptor chunks [] = {
+    { 0, true }
   };
 
   rtems_rbheap_control control;
@@ -282,25 +265,19 @@ static void test_alloc_huge_chunk(void)
 
   test_init_successful(&control);
 
-  ptr = rtems_rbheap_allocate(&control, (PAGE_COUNT + 1) * PAGE_SIZE);
+  ptr = rtems_rbheap_allocate(&control, (TEST_PAGE_COUNT + 1) * TEST_PAGE_SIZE);
   rtems_test_assert(ptr == NULL);
 
-  TEST_PAGE_TREE(&control, indices, frees);
+  TEST_PAGE_TREE(&control, chunks);
 }
 
 static void test_alloc_one_chunk(void)
 {
-  static const uintptr_t indices_0 [] = {
-    0
+  static const chunk_descriptor chunks_0 [] = {
+    { 0, false }
   };
-  static const bool frees_0 [] = {
-    false
-  };
-  static const uintptr_t indices_1 [] = {
-    0
-  };
-  static const bool frees_1 [] = {
-    true,
+  static const chunk_descriptor chunks_1 [] = {
+    { 0, true },
   };
 
   rtems_status_code sc = RTEMS_SUCCESSFUL;
@@ -309,72 +286,59 @@ static void test_alloc_one_chunk(void)
 
   test_init_successful(&control);
 
-  ptr = rtems_rbheap_allocate(&control, PAGE_COUNT * PAGE_SIZE);
+  ptr = rtems_rbheap_allocate(&control, TEST_PAGE_COUNT * TEST_PAGE_SIZE);
   rtems_test_assert(ptr != NULL);
 
-  TEST_PAGE_TREE(&control, indices_0, frees_0);
+  TEST_PAGE_TREE(&control, chunks_0);
 
   sc = rtems_rbheap_free(&control, ptr);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-  TEST_PAGE_TREE(&control, indices_1, frees_1);
+  TEST_PAGE_TREE(&control, chunks_1);
 }
 
 static void test_alloc_many_chunks(void)
 {
-  static const uintptr_t indices_0 [] = {
-    0,
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7
+  static const chunk_descriptor chunks_0 [] = {
+    { 0, false },
+    { 1, false },
+    { 2, false },
+    { 3, false },
+    { 4, false },
+    { 5, false },
+    { 6, false },
+    { 7, false }
   };
-  static const bool frees_0 [] = {
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false,
-    false
-  };
-  static const uintptr_t indices_1 [] = {
-    0
-  };
-  static const bool frees_1 [] = {
-    true,
+  static const chunk_descriptor chunks_1 [] = {
+    { 0, true }
   };
 
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   rtems_rbheap_control control;
-  void *ptr [PAGE_COUNT];
+  void *ptr [TEST_PAGE_COUNT];
   void *null = NULL;
   int i = 0;
 
   test_init_successful(&control);
 
-  for (i = 0; i < PAGE_COUNT; ++i) {
-    ptr [i] = rtems_rbheap_allocate(&control, PAGE_SIZE);
+  for (i = 0; i < TEST_PAGE_COUNT; ++i) {
+    ptr [i] = rtems_rbheap_allocate(&control, TEST_PAGE_SIZE);
     rtems_test_assert(ptr [i] != NULL);
   }
 
-  TEST_PAGE_TREE(&control, indices_0, frees_0);
+  TEST_PAGE_TREE(&control, chunks_0);
 
-  null = rtems_rbheap_allocate(&control, PAGE_SIZE);
+  null = rtems_rbheap_allocate(&control, TEST_PAGE_SIZE);
   rtems_test_assert(null == NULL);
 
-  TEST_PAGE_TREE(&control, indices_0, frees_0);
+  TEST_PAGE_TREE(&control, chunks_0);
 
-  for (i = 0; i < PAGE_COUNT; ++i) {
+  for (i = 0; i < TEST_PAGE_COUNT; ++i) {
     sc = rtems_rbheap_free(&control, ptr [i]);
     rtems_test_assert(sc == RTEMS_SUCCESSFUL);
   }
 
-  TEST_PAGE_TREE(&control, indices_1, frees_1);
+  TEST_PAGE_TREE(&control, chunks_1);
 }
 
 static void test_alloc_misaligned(void)
@@ -384,7 +348,7 @@ static void test_alloc_misaligned(void)
 
   test_init_successful(&control);
 
-  p = rtems_rbheap_allocate(&control, PAGE_SIZE - 1);
+  p = rtems_rbheap_allocate(&control, TEST_PAGE_SIZE - 1);
   rtems_test_assert(p != NULL);
 }
 
@@ -399,7 +363,7 @@ static void test_alloc_with_malloc_extend(void)
     &control,
     area,
     sizeof(area),
-    PAGE_SIZE,
+    TEST_PAGE_SIZE,
     rtems_rbheap_extend_descriptors_with_malloc,
     NULL
   );
@@ -407,12 +371,12 @@ static void test_alloc_with_malloc_extend(void)
 
   opaque = rtems_heap_greedy_allocate(NULL, 0);
 
-  p = rtems_rbheap_allocate(&control, PAGE_SIZE);
+  p = rtems_rbheap_allocate(&control, TEST_PAGE_SIZE);
   rtems_test_assert(p == NULL);
 
   rtems_heap_greedy_free(opaque);
 
-  p = rtems_rbheap_allocate(&control, PAGE_SIZE);
+  p = rtems_rbheap_allocate(&control, TEST_PAGE_SIZE);
   rtems_test_assert(p != NULL);
 }
 
@@ -446,7 +410,7 @@ static void test_free_double(void)
 
   test_init_successful(&control);
 
-  ptr = rtems_rbheap_allocate(&control, PAGE_COUNT * PAGE_SIZE);
+  ptr = rtems_rbheap_allocate(&control, TEST_PAGE_COUNT * TEST_PAGE_SIZE);
   rtems_test_assert(ptr != NULL);
 
   sc = rtems_rbheap_free(&control, ptr);
@@ -466,81 +430,43 @@ enum {
 
 static void test_free_merge_left_or_right(bool left)
 {
-  static const uintptr_t indices_0 [] = {
-    0,
-    3,
-    4,
-    5,
-    6,
-    7
+  static const chunk_descriptor chunks_0 [] = {
+    { 0, true },
+    { 3, false },
+    { 4, false },
+    { 5, false },
+    { 6, false },
+    { 7, false }
   };
-  static const bool frees_0 [] = {
-    true,
-    false,
-    false,
-    false,
-    false,
-    false
+  static const chunk_descriptor chunks_1_left [] = {
+    { 0, true },
+    { 3, false },
+    { 4, true },
+    { 5, false },
+    { 6, false },
+    { 7, false }
   };
-  static const uintptr_t indices_1_left [] = {
-    0,
-    3,
-    4,
-    5,
-    6,
-    7
+  static const chunk_descriptor chunks_1_right [] = {
+    { 0, true },
+    { 3, false },
+    { 4, false },
+    { 5, false },
+    { 6, true },
+    { 7, false }
   };
-  static const bool frees_1_left [] = {
-    true,
-    false,
-    true,
-    false,
-    false,
-    false
+  static const chunk_descriptor chunks_2_left [] = {
+    { 0, true },
+    { 3, false },
+    { 4, true },
+    { 6, false },
+    { 7, false }
   };
-  static const uintptr_t indices_1_right [] = {
-    0,
-    3,
-    4,
-    5,
-    6,
-    7
-  };
-  static const bool frees_1_right [] = {
-    true,
-    false,
-    false,
-    false,
-    true,
-    false
-  };
-  static const uintptr_t indices_2_left [] = {
-    0,
-    3,
-    4,
-    6,
-    7
-  };
-  static const bool frees_2_left [] = {
-    true,
-    false,
-    true,
-    false,
-    false
-  };
-  static const uintptr_t indices_2_right [] = {
-    0,
-    3,
-    4,
-    5,
-    7
-  };
-  static const bool frees_2_right [] = {
-    true,
-    false,
-    false,
-    true,
-    false
+  static const chunk_descriptor chunks_2_right [] = {
+    { 0, true },
+    { 3, false },
+    { 4, false },
+    { 5, true },
+    { 7, false }
   };
 
   rtems_status_code sc = RTEMS_SUCCESSFUL;
@@ -552,28 +478,28 @@ static void test_free_merge_left_or_right(bool left)
   test_init_successful(&control);
 
   for (i = sizeof(ptr) / sizeof(ptr [0]) - 1; i >= 0; --i) {
-    ptr [i] = rtems_rbheap_allocate(&control, PAGE_SIZE);
+    ptr [i] = rtems_rbheap_allocate(&control, TEST_PAGE_SIZE);
     rtems_test_assert(ptr [i] != NULL);
   }
 
-  TEST_PAGE_TREE(&control, indices_0, frees_0);
+  TEST_PAGE_TREE(&control, chunks_0);
 
   sc = rtems_rbheap_free(&control, ptr [dir]);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
   if (left) {
-    TEST_PAGE_TREE(&control, indices_1_left, frees_1_left);
+    TEST_PAGE_TREE(&control, chunks_1_left);
   } else {
-    TEST_PAGE_TREE(&control, indices_1_right, frees_1_right);
+    TEST_PAGE_TREE(&control, chunks_1_right);
   }
 
   sc = rtems_rbheap_free(&control, ptr [MIDDLE]);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
   if (left) {
-    TEST_PAGE_TREE(&control, indices_2_left, frees_2_left);
+    TEST_PAGE_TREE(&control, chunks_2_left);
   } else {
-    TEST_PAGE_TREE(&control, indices_2_right, frees_2_right);
+    TEST_PAGE_TREE(&control, chunks_2_right);
   }
 }
 
@@ -604,7 +530,7 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS 1
 

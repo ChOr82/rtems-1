@@ -46,7 +46,7 @@ __RCSID("$NetBSD: verrx.c,v 1.13 2005/09/13 01:44:09 christos Exp $");
 #endif
 #endif /* LIBC_SCCS and not lint */
 
-#include <err.h>
+#include "err.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -56,7 +56,7 @@ __weak_alias(verrx, _verrx)
 #endif
 
 __dead void
-verrx(jmp_buf* exit_jmp, int eval __attribute__((unused)), const char *fmt, _BSD_VA_LIST_ ap)
+verrx(jmp_buf* exit_jmp, int eval RTEMS_UNUSED, const char *fmt, _BSD_VA_LIST_ ap)
 {
 #if 0
 	(void)fprintf(stderr, "%s: ", getprogname());

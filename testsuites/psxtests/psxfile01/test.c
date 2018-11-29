@@ -57,6 +57,10 @@ char test_write_buffer[ 1024 ];
 rtems_filesystem_operations_table  IMFS_ops_no_evalformake;
 rtems_filesystem_operations_table  IMFS_ops_no_rename;
 
+static const char somefile[] = "somefile";
+
+static const char somelink[] = "somelink";
+
 /*
  *  File test support routines.
  */
@@ -118,7 +122,6 @@ void stat_a_file(
   rtems_test_assert( file );
 
   printf( "stat( %s ) returned ", file );
-  fflush( stdout );
 
   status = stat( file, &statbuf );
 
@@ -129,6 +132,114 @@ void stat_a_file(
     dump_statbuf( &statbuf );
   }
 
+}
+
+static void test_open_directory(void)
+{
+  int status;
+  int fd;
+
+  fd = open( somefile, O_CREAT, S_IRWXU );
+  rtems_test_assert( fd >= 0 );
+
+  status = close( fd );
+  rtems_test_assert( status == 0 );
+
+#ifdef O_DIRECTORY
+  errno = 0;
+  fd = open( somefile, O_DIRECTORY, S_IRWXU );
+  rtems_test_assert( fd == -1 );
+  rtems_test_assert( errno == ENOTDIR );
+#endif
+
+  status = unlink( somefile );
+  rtems_test_assert( status == 0 );
+
+  errno = 0;
+  fd = open( somefile, O_RDONLY );
+  rtems_test_assert( fd == -1 );
+  rtems_test_assert( errno == ENOENT );
+}
+
+static void test_open_cloexec(void)
+{
+  int status;
+  int fd;
+  mode_t mode;
+
+  mode = O_CREAT;
+
+#ifdef O_CLOEXEC
+  mode |= O_CLOEXEC;
+#endif
+
+  fd = open( somefile, mode, S_IRWXU );
+  rtems_test_assert( fd >= 0 );
+
+  status = close( fd );
+  rtems_test_assert( status == 0 );
+
+  status = unlink( somefile );
+  rtems_test_assert( status == 0 );
+
+  errno = 0;
+  fd = open( somefile, O_RDONLY );
+  rtems_test_assert( fd == -1 );
+  rtems_test_assert( errno == ENOENT );
+}
+
+static void test_open_nofollow(void)
+{
+  int status;
+  int fd;
+  struct stat st;
+
+  fd = open( somefile, O_CREAT, S_IRWXU );
+  rtems_test_assert( fd >= 0 );
+
+  status = close( fd );
+  rtems_test_assert( status == 0 );
+
+  status = symlink( somefile, somelink );
+  rtems_test_assert( status == 0 );
+
+  fd = open( somelink, O_RDONLY );
+  rtems_test_assert( fd >= 0 );
+
+  status = fstat( fd, &st );
+  rtems_test_assert( status == 0 );
+  rtems_test_assert( S_ISREG( st.st_mode ) );
+
+  status = close( fd );
+  rtems_test_assert( status == 0 );
+
+#ifdef O_NOFOLLOW
+  fd = open( somelink, O_RDONLY | O_NOFOLLOW );
+  rtems_test_assert( fd >= 0 );
+
+  status = fstat( fd, &st );
+  rtems_test_assert( status == 0 );
+  rtems_test_assert( S_ISLNK( st.st_mode ) );
+
+  status = close( fd );
+  rtems_test_assert( status == 0 );
+#endif
+
+  status = unlink( somelink );
+  rtems_test_assert( status == 0 );
+
+  errno = 0;
+  fd = open( somelink, O_RDONLY );
+  rtems_test_assert( fd == -1 );
+  rtems_test_assert( errno == ENOENT );
+
+  status = unlink( somefile );
+  rtems_test_assert( status == 0 );
+
+  errno = 0;
+  fd = open( somefile, O_RDONLY );
+  rtems_test_assert( fd == -1 );
+  rtems_test_assert( errno == ENOENT );
 }
 
 /*
@@ -161,6 +272,10 @@ int main(
   rtems_time_of_day time;
 
   TEST_BEGIN();
+
+  test_open_directory();
+  test_open_cloexec();
+  test_open_nofollow();
 
   /*
    *  Grab the maximum size of an in-memory file.
@@ -335,7 +450,7 @@ int main(
   status = close( fd );
   rtems_test_assert( status == 0 );
 
-  /* 
+  /*
    * Open a file in read-only mode and try to truncate
    */
 
@@ -362,7 +477,7 @@ int main(
   rtems_test_assert( status == -1 );
   rtems_test_assert( errno == EINVAL );
 
-  /* 
+  /*
    * Read from filedes opened for write
    */
 
@@ -387,7 +502,7 @@ int main(
   puts( "open /tmp/bha in read only mode -- OK" );
   fd = open( "/tmp/bha", O_CREAT | O_RDONLY, S_IRWXU|S_IRWXG|S_IRWXO );
   rtems_test_assert( fd != -1 );
-  
+
   puts( "attempt to read from /tmp/bha - expect EBADF" );
   status = write( fd, buffer, 10 );
   rtems_test_assert( status == -1 );
@@ -398,7 +513,7 @@ int main(
   status |= unlink( "/tmp/bha" );
   rtems_test_assert( status == 0 );
 
-  /* 
+  /*
    * Read/write from an unopened filedes
    */
   puts( "attempt to read from an unopened filedes - expect EBADF" );
@@ -624,8 +739,9 @@ since new path is not valid");
   rtems_test_assert( ctime1 != ctime2);
 
   /* try to truncate the console and see what happens */
+  errno = 0;
   status = truncate( "/dev/console", 40 );
-  rtems_test_assert( status == 0 );
+  rtems_test_assert( status == 0 || ( status == -1 && errno == EINVAL ) );
 
   puts( "truncate /tmp/j to length of 0" );
   status = truncate( "/tmp/j", 0 );

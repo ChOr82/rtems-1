@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 #if HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -14,19 +16,21 @@
 #include <sys/domain.h>
 
 #include <net/if.h>
+#include <net/if_var.h>
 #include <net/if_dl.h>
 #include <net/route.h>
 
 #include <netinet/in.h>
-
-#include <arpa/inet.h>
 
 /*
  * We'll use the application versions of realloc and free.
  */
 #undef free
 #undef malloc
+#undef random
 #include <stdlib.h>
+
+#include <rtems/rtems_bsdnet.h>
 
 /*
  * Information per route

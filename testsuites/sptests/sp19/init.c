@@ -28,6 +28,15 @@
 
 const char rtems_test_name[] = "SP 19";
 
+void thread_switch_extension( Thread_Control *executing, Thread_Control *heir )
+{
+  if ( heir->is_fp ) {
+    rtems_print_printer_fprintf_putc( &rtems_test_printer );
+  } else {
+    rtems_print_printer_printk( &rtems_test_printer );
+  }
+}
+
 rtems_task Init(
   rtems_task_argument argument
 )
@@ -148,6 +157,5 @@ rtems_task Init(
   INTEGER_factors[8] = 0x8000;
   INTEGER_factors[9] = 0x9000;
 
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "rtems_task_delete of TA1" );
+  rtems_task_exit();
 }

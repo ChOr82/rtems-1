@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-user-space.h>
+
 /*-
  * Copyright (c) 1985, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -70,6 +72,7 @@
 
 #include <stdio.h>
 #include <netdb.h>
+#include <rtems/rtems_netdb.h>
 #include <resolv.h>
 #include <ctype.h>
 #include <errno.h>
@@ -78,8 +81,6 @@
 #include <syslog.h>
 
 #include "res_config.h"
-
-extern int h_errno;
 
 #define BYADDR 0
 #define BYNAME 1

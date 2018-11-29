@@ -60,7 +60,7 @@ static void suicide_task(rtems_task_argument arg)
 
   printf("suicide task %d\n", me);
 
-  rtems_task_delete(RTEMS_SELF);
+  rtems_task_exit();
   rtems_test_assert(false);
 }
 
@@ -104,7 +104,7 @@ void Init(rtems_task_argument arg)
 
 #define CONFIGURE_INIT
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS 3

@@ -140,6 +140,7 @@ static void benchmark_mq_unlink(void)
 
 static void benchmark_mq_notify(void)
 {
+#if defined(RTEMS_POSIX_API)
   benchmark_timer_t end_time;
   int             status;
   struct sigevent event;
@@ -159,6 +160,7 @@ static void benchmark_mq_notify(void)
     0,
     0
   );
+#endif
 }
 
 static void benchmark_mq_send(void)
@@ -295,13 +297,12 @@ void *POSIX_Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 
 #define CONFIGURE_MAXIMUM_POSIX_THREADS     1
 #define CONFIGURE_POSIX_INIT_THREAD_TABLE
 #define CONFIGURE_MAXIMUM_POSIX_MESSAGE_QUEUES  2
-#define CONFIGURE_MAXIMUM_POSIX_MESSAGE_QUEUE_DESCRIPTORS 2
 
 #define CONFIGURE_INIT
 

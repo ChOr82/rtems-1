@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 /*
  *  DCHP client for RTEMS
  *  Andrew Bythell, <abythell@nortelnetworks.com>
@@ -54,20 +56,7 @@
  *
  */
 
-/*
- * WARNING:
- *   This file should be moved into c/src/libnetworking/nfs
- *   and the following two #ifndef...#endif blocks and the #undefs at
- *   the end of the file should be removed
- */
-
-#ifndef __INSIDE_RTEMS_BSD_TCPIP_STACK__
-#define __INSIDE_RTEMS_BSD_TCPIP_STACK__
-#endif
-
-#ifndef __BSD_VISIBLE
-#define __BSD_VISIBLE 1
-#endif
+#include <machine/rtems-bsd-kernel-space.h>
 
 #if HAVE_CONFIG_H
 #include "config.h"
@@ -80,8 +69,9 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 
-#include <sys/ioctl.h>
+#include <sys/sockio.h>
 #include <sys/param.h>		/* for MAXHOSTNAMELEN */
 #include <sys/systm.h>
 #include <sys/socketvar.h>	/* for socreat() soclose() */
@@ -394,15 +384,23 @@ process_options (unsigned char *optbuf, int optbufSize)
           printf ("dhcpc: hostname >= %d bytes\n", MAXHOSTNAMELEN);
           len = MAXHOSTNAMELEN-1;
         }
-        if (sethostname (p, len) < 0)
+        if (sethostname (p, len) < 0) {
           printf ("dhcpc: can't set host name");
+        }
         if (dhcp_hostname != NULL)
         {
-          dhcp_hostname = realloc (dhcp_hostname, len);
-          strncpy (dhcp_hostname, p, len);
-        }
-        else
+          char *tmp = realloc (dhcp_hostname, len);
+          if (tmp != NULL) {
+            dhcp_hostname = tmp;
+            strncpy (dhcp_hostname, p, len);
+          } else {  /* realloc failed */
+            printf ("dhcpc: realloc failed (%s:%d)", __FILE__, __LINE__);
+            free (dhcp_hostname, 0);
+            dhcp_hostname = NULL;
+          }
+        } else { /* dhcp_hostname == NULL */
           dhcp_hostname = strndup (p, len);
+        }
         break;
 
       case 7:
@@ -751,7 +749,8 @@ dhcp_task (rtems_task_argument _sdl)
       /*
        * Send the Request.
        */
-      error = bootpc_call ((struct bootp_packet *)&call, (struct bootp_packet *)&dhcp_req, procp);
+      error = bootpc_call ((struct bootp_packet *)&call,
+                           (struct bootp_packet *)&dhcp_req, procp, NULL, 0);
       if (error) {
         rtems_bsdnet_semaphore_release ();
         printf ("DHCP call failed -- error %d", error);
@@ -797,7 +796,7 @@ dhcp_task (rtems_task_argument _sdl)
 
   dhcp_task_id = 0;
   printf ("dhcpc: exiting lease renewal task.\n");
-  rtems_task_delete( RTEMS_SELF);
+  rtems_task_exit();
 
 }
 
@@ -892,6 +891,7 @@ dhcp_init (int update_files)
   struct ifaddr        *ifa;
   struct sockaddr_dl   *sdl = NULL;
   struct proc          *procp = NULL;
+  char expected_dhcp_payload[7];
 
   clean_dns_entries();
 
@@ -948,15 +948,26 @@ dhcp_init (int update_files)
     return -1;
   }
 
+
   /*
    * Build the DHCP Discover
    */
   dhcp_discover_req (&call, sdl, &xid);
 
   /*
+   * Expect a DHCP offer as response to DHCP discover
+   */
+  memcpy(expected_dhcp_payload, dhcp_magic_cookie, sizeof(dhcp_magic_cookie));
+  expected_dhcp_payload[sizeof(dhcp_magic_cookie)  ]=0x35; /* DHCP */
+  expected_dhcp_payload[sizeof(dhcp_magic_cookie)+1]=0x01; /* Length : 1 */
+  expected_dhcp_payload[sizeof(dhcp_magic_cookie)+2]=0x02; /* DHCP_OFFER */
+
+  /*
    * Send the Discover.
    */
-  error = bootpc_call ((struct bootp_packet *)&call, (struct bootp_packet *)&reply, procp);
+  error = bootpc_call ((struct bootp_packet *)&call,
+                       (struct bootp_packet *)&reply, procp,
+                       expected_dhcp_payload, sizeof(expected_dhcp_payload));
   if (error) {
     printf ("BOOTP call failed -- %s\n", strerror(error));
     soclose (so);
@@ -981,11 +992,20 @@ dhcp_init (int update_files)
   }
 
   /*
+   * Expect a DHCP_ACK as response to the DHCP REQUEST
+   * No need to reinitialize the whole expected_dhcp_payload variable,
+   * header and first two bytes of the payload are filled from DHCP offer
+   */
+  expected_dhcp_payload[sizeof(dhcp_magic_cookie)+2]=0x05; /* DHCP_ACK */
+
+  /*
    * Send a DHCP REQUEST
    */
   dhcp_request_req (&call, &reply, sdl, true);
 
-  error = bootpc_call ((struct bootp_packet *)&call, (struct bootp_packet *)&reply, procp);
+  error = bootpc_call ((struct bootp_packet *)&call,
+                       (struct bootp_packet *)&reply, procp,
+                       expected_dhcp_payload, sizeof(expected_dhcp_payload));
   if (error) {
     printf ("BOOTP call failed -- %s\n", strerror(error));
     soclose (so);
@@ -1123,8 +1143,9 @@ dhcp_init (int update_files)
       }
 
       for (i = 0; i < rtems_bsdnet_nameserver_count; i++) {
+        char addrbuf[INET_ADDRSTRLEN];
         strcpy(buf, "nameserver ");
-        strcat(buf, inet_ntoa(rtems_bsdnet_ntpserver[i]));
+        strcat(buf, inet_ntoa_r(rtems_bsdnet_ntpserver[i], addrbuf));
         strcat(buf, "\n");
         if (rtems_rootfs_file_append ("/etc/resolv.conf", MKFILE_MODE, 1, bufl))
           break;

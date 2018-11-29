@@ -13,7 +13,7 @@
 #include <rtems.h>
 #include <rtems/rtems_bsdnet.h>
 #include "pppd.h"
-#include "rtemspppd.h"
+#include <rtems/rtemspppd.h>
 
 
 /* define pppd function prototypes */
@@ -72,7 +72,7 @@ static rtems_task pppTask(rtems_task_argument arg)
 
   /* terminate myself */
   rtems_pppd_taskid = 0;
-  rtems_task_delete(RTEMS_SELF);
+  rtems_task_exit();
 }
 
 int rtems_pppd_initialize(void)

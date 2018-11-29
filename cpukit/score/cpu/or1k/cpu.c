@@ -69,32 +69,24 @@ uint32_t  _CPU_ISR_Get_level( void )
 }
 
 void _CPU_ISR_install_raw_handler(
-  uint32_t   vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
+  uint32_t             vector,
+  CPU_ISR_raw_handler  new_handler,
+  CPU_ISR_raw_handler *old_handler
 )
 {
-}
-
-void _CPU_ISR_install_vector(
-  uint32_t    vector,
-  proc_ptr    new_handler,
-  proc_ptr   *old_handler
-)
-{
-   proc_ptr *table =
-     (proc_ptr *) bsp_start_vector_table_begin;
-   proc_ptr current_handler;
+   CPU_ISR_raw_handler *table =
+     (CPU_ISR_raw_handler *) bsp_start_vector_table_begin;
+   CPU_ISR_raw_handler current_handler;
 
    ISR_Level level;
 
-  _ISR_Disable( level );
+  _ISR_Local_disable( level );
 
   current_handler = table [vector];
 
   /* The current handler is now the old one */
   if (old_handler != NULL) {
-    *old_handler = (proc_ptr) current_handler;
+    *old_handler = current_handler;
   }
 
   /* Write only if necessary to avoid writes to a maybe read-only memory */
@@ -102,11 +94,7 @@ void _CPU_ISR_install_vector(
     table [vector] = new_handler;
   }
 
-   _ISR_Enable( level );
-}
-
-void _CPU_Install_interrupt_stack( void )
-{
+   _ISR_Local_enable( level );
 }
 
 void *_CPU_Thread_Idle_body( uintptr_t ignored )

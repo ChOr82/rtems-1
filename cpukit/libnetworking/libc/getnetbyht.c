@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-user-space.h>
+
 /*
  * Copyright (c) 1983, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -51,6 +53,7 @@
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 #include <netdb.h>
+#include <rtems/rtems_netdb.h>
 #include <stdio.h>
 #include <string.h>
 #ifdef HAVE_STRINGS_H

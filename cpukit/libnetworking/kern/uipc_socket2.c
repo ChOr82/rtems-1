@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 /*
  * This file has undergone several changes to reflect the
  * differences between the RTEMS and FreeBSD kernels.
@@ -343,7 +345,7 @@ int
 sbreserve(struct sockbuf *sb, u_long cc)
 {
 
-	if (cc > sb_max * MCLBYTES / (MSIZE + MCLBYTES))
+	if (cc > sb_max * MCLBYTES / (_SYS_MBUF_LEGACY_MSIZE + MCLBYTES))
 		return (0);
 	sb->sb_hiwat = cc;
 	sb->sb_mbmax = min(cc * sb_efficiency, sb_max);
@@ -424,7 +426,7 @@ sbcheck(struct sockbuf *sb)
 
 	for (m = sb->sb_mb; m; m = m->m_next) {
 		len += m->m_len;
-		mbcnt += MSIZE;
+		mbcnt += _SYS_MBUF_LEGACY_MSIZE;
 		if (m->m_flags & M_EXT) /*XXX*/ /* pretty sure this is bogus */
 			mbcnt += m->m_ext.ext_size;
 		if (m->m_nextpkt)

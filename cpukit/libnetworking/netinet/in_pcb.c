@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 /*
  * Copyright (c) 1982, 1986, 1991, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
@@ -43,7 +45,7 @@
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#include <sys/ioctl.h>
+#include <sys/sockio.h>
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/proc.h>
@@ -54,6 +56,7 @@
 #include <net/route.h>
 
 #include <netinet/in.h>
+#include <rtems/rtems_netinet_in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>

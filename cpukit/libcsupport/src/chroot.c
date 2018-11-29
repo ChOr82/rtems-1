@@ -23,6 +23,7 @@
   #include "config.h"
 #endif
 
+#include <string.h>
 #include <unistd.h>
 
 #include <rtems/libio_.h>
@@ -44,6 +45,7 @@ int chroot( const char *path )
   rtems_filesystem_eval_path_start_with_root_and_current(
     &ctx,
     path,
+    strlen( path ),
     eval_flags,
     &rtems_global_user_env.root_directory,
     &rtems_global_user_env.current_directory
@@ -79,7 +81,7 @@ int chroot( const char *path )
     }
 
     if ( rv != 0 ) {
-      rtems_filesystem_global_location_release( new_root_loc );
+      rtems_filesystem_global_location_release( new_root_loc, true );
     }
   } else {
     rv = -1;
@@ -88,7 +90,7 @@ int chroot( const char *path )
   rtems_filesystem_eval_path_cleanup( &ctx );
 
   if ( rv != 0 ) {
-    rtems_filesystem_global_location_release( new_current_loc );
+    rtems_filesystem_global_location_release( new_current_loc, false );
   }
 
   return rv;

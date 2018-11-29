@@ -96,12 +96,8 @@ static void test(const char *rda, const char *mnt, const char *file)
     .sync_device = true
   };
 
-  rtems_status_code sc;
   int disk_fd;
   int rv;
-
-  sc = rtems_disk_io_initialize();
-  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
   disk_fd = open(rda, O_RDWR);
   rtems_test_assert(disk_fd >= 0);
@@ -156,7 +152,7 @@ rtems_ramdisk_config rtems_ramdisk_configuration [] = {
 size_t rtems_ramdisk_configuration_size = 1;
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_EXTRA_DRIVERS RAMDISK_DRIVER_TABLE_ENTRY
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
 
@@ -171,6 +167,8 @@ size_t rtems_ramdisk_configuration_size = 1;
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
+
+#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 
 #define CONFIGURE_INIT
 

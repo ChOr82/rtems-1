@@ -56,7 +56,7 @@ rtems_task Test_Thread(rtems_task_argument argument)
   rtems_test_assert( value_p == value_p2 );
   ++got_thread_count;
 
-  rtems_task_delete( RTEMS_SELF );
+  rtems_task_exit();
 }
 
 rtems_task Init(rtems_task_argument argument)
@@ -190,15 +190,13 @@ rtems_task Init(rtems_task_argument argument)
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_MAXIMUM_TASKS          rtems_resource_unlimited(10)
-#define CONFIGURE_MAXIMUM_POSIX_MUTEXES  2
 #define CONFIGURE_MAXIMUM_POSIX_KEYS     1
-#define CONFIGURE_MAXIMUM_POSIX_CONDITION_VARIABLES  2
 #define CONFIGURE_UNIFIED_WORK_AREAS
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE

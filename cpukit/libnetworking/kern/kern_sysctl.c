@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 /*-
  * Copyright (c) 1982, 1986, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -94,7 +96,8 @@ static struct sx sysctllock;
 #define	SYSCTL_INIT()		sx_init(&sysctllock, "sysctl lock")
 #endif
 
-static int sysctl_root(SYSCTL_HANDLER_ARGS);
+static int sysctl_root(struct sysctl_oid *oidp, const void *arg1,
+    intptr_t arg2, struct sysctl_req *req);
 
 struct sysctl_oid_list sysctl__children; /* root list */
 
@@ -1094,7 +1097,7 @@ sysctl_wire_old_buffer(struct sysctl_req *req, size_t len)
 }
 
 int
-sysctl_find_oid(int *name, u_int namelen, struct sysctl_oid **noid,
+sysctl_find_oid(const int *name, u_int namelen, struct sysctl_oid **noid,
     int *nindx, struct sysctl_req *req)
 {
 	struct sysctl_oid *oid;
@@ -1138,7 +1141,8 @@ sysctl_find_oid(int *name, u_int namelen, struct sysctl_oid **noid,
  */
 
 static int
-sysctl_root(SYSCTL_HANDLER_ARGS)
+sysctl_root(struct sysctl_oid *oidp, const void *arg1, intptr_t arg2,
+    struct sysctl_req *req)
 {
 	struct sysctl_oid *oid;
 	int error, indx;
@@ -1197,6 +1201,7 @@ sysctl_root(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
+#ifndef __rtems__
 #ifndef _SYS_SYSPROTO_H_
 struct sysctl_args {
 	int	*name;
@@ -1240,14 +1245,15 @@ done2:
 	mtx_unlock(&Giant);
 	return (error);
 }
+#endif /* __rtems__ */
 
 /*
  * This is used from various compatibility syscalls too.  That's why name
  * must be in kernel space.
  */
 int
-userland_sysctl(struct thread *td, int *name, u_int namelen, void *old,
-    size_t *oldlenp, int inkernel, void *new, size_t newlen, size_t *retval)
+userland_sysctl(struct thread *td, const int *name, u_int namelen, void *old,
+    size_t *oldlenp, int inkernel, const void *new, size_t newlen, size_t *retval)
 {
 	int error = 0;
 	struct sysctl_req req, req2;

@@ -22,34 +22,24 @@
 #include "config.h"
 #endif
 
-#include <rtems.h>
-#include <rtems.h>
-#include <rtems/libio.h>
-#include <ctype.h>
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <termios.h>
-#include <unistd.h>
+#include <rtems/termiostypes.h>
 
-rtems_id rtems_termios_ttyMutex;
+rtems_mutex rtems_termios_ttyMutex = RTEMS_MUTEX_INITIALIZER( "termios" );
 
 void
-rtems_termios_initialize (void)
+rtems_termios_device_lock_acquire_default(
+  rtems_termios_device_context *ctx,
+  rtems_interrupt_lock_context *lock_context
+)
 {
-  rtems_status_code sc;
+  rtems_interrupt_lock_acquire (&ctx->lock.interrupt, lock_context);
+}
 
-  /*
-   * Create the mutex semaphore for the tty list
-   */
-  if (!rtems_termios_ttyMutex) {
-    sc = rtems_semaphore_create (
-      rtems_build_name ('T', 'R', 'm', 'i'),
-      1,
-      RTEMS_BINARY_SEMAPHORE | RTEMS_INHERIT_PRIORITY | RTEMS_PRIORITY,
-      RTEMS_NO_PRIORITY,
-      &rtems_termios_ttyMutex);
-    if (sc != RTEMS_SUCCESSFUL)
-      rtems_fatal_error_occurred (sc);
-  }
+void
+rtems_termios_device_lock_release_default(
+  rtems_termios_device_context *ctx,
+  rtems_interrupt_lock_context *lock_context
+)
+{
+  rtems_interrupt_lock_release (&ctx->lock.interrupt, lock_context);
 }

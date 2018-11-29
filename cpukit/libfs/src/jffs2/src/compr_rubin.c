@@ -1,3 +1,5 @@
+#include "rtems-jffs2-config.h"
+
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
@@ -82,11 +84,6 @@ static inline int pullbit(struct pushpull *pp)
 
 	pp->ofs++;
 	return bit;
-}
-
-static inline int pulledbits(struct pushpull *pp)
-{
-	return pp->ofs;
 }
 
 

@@ -12,10 +12,11 @@
 #ifndef BDBUF_TESTS_H
 #define BDBUF_TESTS_H
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <rtems/diskdevs.h>
+#include <rtems/bspIo.h>
 #include <rtems/bdbuf.h>
 
 #ifdef __cplusplus
@@ -44,11 +45,7 @@ extern void bdbuf_test4_1_main(void);
 extern void bdbuf_test4_2_main(void);
 extern void bdbuf_test4_3_main(void);
 
-extern rtems_device_driver
-test_disk_initialize(
-    rtems_device_major_number major,
-    rtems_device_minor_number minor,
-    void *arg);
+extern rtems_status_code test_disk_initialize(void);
 
 #define ARRAY_NUM(a_) (sizeof(a_) / sizeof(a_[0]))
 
@@ -74,8 +71,8 @@ enum bdbuf_test_msg_type {
  * Message used in communication between test disk driver
  * and main test task.
  * All R/W requests obtained by driver (from bdbuf library)
- * are directed to main test task. Then main test task 
- * sends a reply after which test disk driver notifies 
+ * are directed to main test task. Then main test task
+ * sends a reply after which test disk driver notifies
  * bdbuf library about operation complete event.
  */
 typedef struct bdbuf_test_msg {
@@ -111,7 +108,7 @@ typedef struct test_ctx {
      * disk device driver.
      */
     Objects_Id test_qid;
-   
+
     /**
      * Object ID for disk driver queue.
      * Test task will send messages to this queue in reply
@@ -122,7 +119,7 @@ typedef struct test_ctx {
     /** Test name */
     const char *test_name;
 
-    /** 
+    /**
      * Semaphore used for synchronization between test thread
      * and main test task.
      * Main test task blocks on one of these semaphores and an auxiliary thread
@@ -210,7 +207,7 @@ extern bool       good_test_result;
     } while (0)
 
 /**
- * Start thread number @p t_num_ with @p func_ function 
+ * Start thread number @p t_num_ with @p func_ function
  * as an entry point of the thread.
  *
  * @param t_num_  thread number.
@@ -255,20 +252,20 @@ extern bool       good_test_result;
     } while (0)
 
 #define WAIT_DRV_MSG_WR(msg_) \
-    do {                                                                \
-        WAIT_DRV_MSG(msg_);                                             \
-        if ((msg_)->val.driver_req.req != RTEMS_BLKIO_REQUEST ||        \
-            (msg_)->val.driver_req.dd != test_dd ||                   \
-            ((rtems_blkdev_request *)                                   \
-                 ((msg_)->val.driver_req.argp))->req !=                 \
-                 RTEMS_BLKDEV_REQ_WRITE)                                \
-        {                                                               \
-            printk("Unexpected message received by disk driver: "       \
-                   "req - 0x%x (0x%x), dev - %d (%d)\n",                \
-                   (msg_)->val.driver_req.req, RTEMS_BLKIO_REQUEST,     \
-                   (msg_)->val.driver_req.dd, test_dd);               \
-            return;                                                     \
-        }                                                               \
+  do {                                                                     \
+        WAIT_DRV_MSG(msg_);                                                \
+        if ((msg_)->val.driver_req.req != RTEMS_BLKIO_REQUEST ||           \
+            (msg_)->val.driver_req.dd != test_dd ||                        \
+            ((rtems_blkdev_request *)                                      \
+                 ((msg_)->val.driver_req.argp))->req !=                    \
+                 RTEMS_BLKDEV_REQ_WRITE)                                   \
+        {                                                                  \
+            printk("Unexpected message received by disk driver: "          \
+                   "req - 0x%" PRIx32 " (0x%lx), dev - %p (%p)\n", \
+                   (msg_)->val.driver_req.req, RTEMS_BLKIO_REQUEST,        \
+                   (msg_)->val.driver_req.dd, test_dd);                    \
+            return;                                                        \
+        }                                                                  \
     } while (0)
 
 #define CHECK_NO_DRV_MSG() \
@@ -298,7 +295,7 @@ extern bdbuf_test_msg test_drv_msg;
  *                     ioctl() function.
  * @param ret_errno_   errno value to set to errno variable.
  * @param res_status_  In case return value from the ioctl()
- *                     function is equal to 0, this value 
+ *                     function is equal to 0, this value
  *                     is used as status code in asynchronous
  *                     notification.
  * @param res_errno_   In case return value from the ioctl()
@@ -333,7 +330,7 @@ extern bdbuf_test_msg test_drv_msg;
  * Block main test task until a thread passes back control
  * with CONTINUE_MAIN().
  *
- * @param t_num_  thread number from which the main thread 
+ * @param t_num_  thread number from which the main thread
  *                is waiting for a sync.
  */
 #define WAIT_THREAD_SYNC(t_num_) \
@@ -448,7 +445,7 @@ extern bdbuf_test_msg test_drv_msg;
         {                                       \
             printk("TEST FAILED (Step %s)\n",   \
                    step_);                      \
-            rtems_task_delete(RTEMS_SELF);      \
+            rtems_task_exit();                  \
         }                                       \
         else                                    \
         {                                       \
@@ -457,7 +454,7 @@ extern bdbuf_test_msg test_drv_msg;
         }                                       \
     } while (0)
 
-#define TEST_END() \
+#define TEST_STOP() \
     do {                                 \
         bdbuf_test_end();                \
                                          \
@@ -478,7 +475,7 @@ extern bdbuf_test_msg test_drv_msg;
                    "main task: %d", rc_);                       \
             return;                                             \
         }                                                       \
-        rtems_task_delete(RTEMS_SELF);                          \
+        rtems_task_exit();                                      \
     } while (0)
 
 #define TEST_FAILED() \
@@ -500,4 +497,3 @@ bdbuf_test_start_aux_task(rtems_name name,
 #endif
 
 #endif /* BDBUF_TESTS_H */
-

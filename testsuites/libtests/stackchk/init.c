@@ -84,23 +84,22 @@ rtems_task Init(
   status = rtems_task_start( Task_id[ 3 ], Task_1_through_3, 0 );
   directive_failed( status, "rtems_task_start of TA3" );
 
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "rtems_task_delete of RTEMS_SELF" );
+  rtems_task_exit();
 }
 
 void Fatal_extension(
   rtems_fatal_source source,
-  bool               is_internal,
+  bool               always_set_to_false,
   rtems_fatal_code   error
 )
 {
   if ( source != RTEMS_FATAL_SOURCE_STACK_CHECKER ) {
     printk( "unexpected fatal source\n" );
-  } else if ( is_internal ) {
+  } else if ( always_set_to_false ) {
     printk( "unexpected fatal is internal\n" );
   } else if ( error != rtems_build_name( 'T', 'A', '1', ' ' ) ) {
     printk( "unexpected fatal error\n" );
   } else {
-    rtems_test_endk();
+    TEST_END();
   }
 }

@@ -6,33 +6,14 @@
 #ifndef _RTEMS_BSDNET_H
 #define _RTEMS_BSDNET_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <rtems.h>
 #include <sys/cpuset.h>
+#include <sys/ioccom.h>
+#include <sys/socket.h>
+#include <net/if.h>
 
-/*
- *  If this file is included from inside the Network Stack proper or
- *  a device driver, then __INSIDE_RTEMS_BSD_TCPIP_STACK__ should be
- *  defined.  This triggers a number of internally used definitions.
- */
-
-#if defined(__INSIDE_RTEMS_BSD_TCPIP_STACK__)
-#undef _KERNEL
-#undef INET
-#undef NFS
-#undef DIAGNOSTIC
-#undef BOOTP_COMPAT
-#undef __BSD_VISIBLE
-
-#define _KERNEL
-#define INET
-#define NFS
-#define DIAGNOSTIC
-#define BOOTP_COMPAT
-#define __BSD_VISIBLE 1
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 /*
@@ -315,6 +296,41 @@ void* rtems_bsdnet_malloc_mbuf(size_t size, int type);
 #define MBUF_MALLOC_NMBCLUSTERS (0)
 #define MBUF_MALLOC_MCLREFCNT   (1)
 #define MBUF_MALLOC_MBUF        (2)
+
+/*
+ * RTEMS-specific socket wake-up additions previously part of <sys/socket.h>.
+ *
+ * An alternative in the LibBSD network stack for this is KQUEUE(2).
+ */
+
+#define SO_SNDWAKEUP	0x1020		/* wakeup when ready to send */
+#define SO_RCVWAKEUP	0x1021		/* wakeup when ready to receive */
+
+/*
+ * RTEMS additions for setting/getting `tap' function on incoming packets.
+ */
+struct ifnet;
+struct ether_header;
+struct mbuf;
+struct	rtems_tap_ifreq {
+	char	ifr_name[IFNAMSIZ];		/* if name, e.g. "en0" */
+	int	(*ifr_tap)(struct ifnet *, struct ether_header *, struct mbuf *);
+};
+#define        SIOCSIFTAP      _IOW('i', 88, struct rtems_tap_ifreq)     /* set tap function */
+#define        SIOCGIFTAP      _IOW('i', 89, struct rtems_tap_ifreq)     /* get tap function */
+
+#define	OSIOCGIFADDR	_IOWR('i', 13, struct ifreq)	/* get ifnet address */
+#define	OSIOCGIFDSTADDR	_IOWR('i', 15, struct ifreq)	/* get p-p address */
+#define	OSIOCGIFBRDADDR	_IOWR('i', 18, struct ifreq)	/* get broadcast addr */
+#define	OSIOCGIFCONF	_IOWR('i', 20, struct ifconf)	/* get ifnet list */
+#define	OSIOCGIFNETMASK _IOWR('i', 21, struct ifreq)	/* get net addr mask */
+
+struct socket;
+
+struct	sockwakeup {
+	void	(*sw_pfn)(struct socket *, void *);
+	void	*sw_arg;
+};
 
 #ifdef __cplusplus
 }

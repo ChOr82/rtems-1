@@ -32,6 +32,7 @@
 #include <time.h>
 
 #include <rtems/jffs2.h>
+#include <rtems/thread.h>
 
 #define CONFIG_JFFS2_RTIME
 
@@ -40,9 +41,10 @@
 struct _inode;
 struct super_block;
 
-static inline unsigned int full_name_hash(const unsigned char * name, size_t len) {
+static inline unsigned int full_name_hash(const void *salt, const unsigned char * name, size_t len) {
 
 	uint32_t hash = 0;
+	(void)salt;
  	while (len--) {
 		hash = (hash << 4) | (hash >> 28);
 		hash ^= *(name++);
@@ -104,7 +106,7 @@ struct super_block {
 	rtems_jffs2_compressor_control	*s_compressor_control;
 	bool			s_is_readonly;
 	unsigned char		s_gc_buffer[PAGE_CACHE_SIZE]; // Avoids malloc when user may be under memory pressure
-	rtems_id		s_mutex;
+	rtems_recursive_mutex	s_mutex;
 	char			s_name_buf[JFFS2_MAX_NAME_LEN];
 };
 
@@ -120,7 +122,12 @@ static inline bool jffs2_is_readonly(struct jffs2_sb_info *c)
 
 static inline void jffs2_garbage_collect_trigger(struct jffs2_sb_info *c)
 {
-       /* We don't have a GC thread in RTEMS (yet) */
+	const struct super_block *sb = OFNI_BS_2SFFJ(c);
+	rtems_jffs2_flash_control *fc = sb->s_flash_control;
+
+	if (fc->trigger_garbage_collection != NULL) {
+		(*fc->trigger_garbage_collection)(fc);
+	}
 }
 
 /* fs-rtems.c */

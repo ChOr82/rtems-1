@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2015, 2016 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
  *  Dornierstr. 4
@@ -15,8 +15,6 @@
 #if HAVE_CONFIG_H
   #include "config.h"
 #endif
-
-#if HAVE_STRUCT__THREAD_QUEUE_QUEUE
 
 #include <sys/lock.h>
 #include <errno.h>
@@ -48,152 +46,122 @@ static Futex_Control *_Futex_Get( struct _Futex_Control *_futex )
   return (Futex_Control *) _futex;
 }
 
-static Thread_Control *_Futex_Queue_acquire(
-  Futex_Control    *futex,
-  ISR_lock_Context *lock_context
+static Thread_Control *_Futex_Queue_acquire_critical(
+  Futex_Control        *futex,
+  Thread_queue_Context *queue_context
 )
 {
   Thread_Control *executing;
 
-  _ISR_lock_ISR_disable( lock_context );
   executing = _Thread_Executing;
   _Thread_queue_Queue_acquire_critical(
     &futex->Queue.Queue,
     &executing->Potpourri_stats,
-    lock_context
+    &queue_context->Lock_context.Lock_context
   );
 
   return executing;
 }
 
 static void _Futex_Queue_release(
-  Futex_Control    *futex,
-  ISR_lock_Context *lock_context
+  Futex_Control        *futex,
+  ISR_Level             level,
+  Thread_queue_Context *queue_context
 )
 {
-  _Thread_queue_Queue_release( &futex->Queue.Queue, lock_context );
+  _Thread_queue_Queue_release_critical(
+    &futex->Queue.Queue,
+    &queue_context->Lock_context.Lock_context
+  );
+  _ISR_Local_enable( level );
 }
 
 int _Futex_Wait( struct _Futex_Control *_futex, int *uaddr, int val )
 {
-  Futex_Control    *futex;
-  ISR_lock_Context  lock_context;
-  Thread_Control   *executing;
-  int               eno;
+  Futex_Control        *futex;
+  ISR_Level             level;
+  Thread_queue_Context  queue_context;
+  Thread_Control       *executing;
+  int                   eno;
 
   futex = _Futex_Get( _futex );
-  executing = _Futex_Queue_acquire( futex, &lock_context );
+  _Thread_queue_Context_initialize( &queue_context );
+  _Thread_queue_Context_ISR_disable( &queue_context, level );
+  executing = _Futex_Queue_acquire_critical( futex, &queue_context );
 
   if ( *uaddr == val ) {
-    _Thread_queue_Enqueue_critical(
+    _Thread_queue_Context_set_thread_state(
+      &queue_context,
+      STATES_WAITING_FOR_FUTEX
+    );
+    _Thread_queue_Context_set_enqueue_do_nothing_extra( &queue_context );
+    _Thread_queue_Context_set_ISR_level( &queue_context, level );
+    _Thread_queue_Enqueue(
       &futex->Queue.Queue,
       FUTEX_TQ_OPERATIONS,
       executing,
-      STATES_WAITING_FOR_SYS_LOCK_FUTEX,
-      0,
-      0,
-      &lock_context
+      &queue_context
     );
     eno = 0;
   } else {
-    _Futex_Queue_release( futex, &lock_context );
+    _Futex_Queue_release( futex, level, &queue_context );
     eno = EWOULDBLOCK;
   }
 
   return eno;
 }
 
-/*
- * Use a noinline function to force the compiler to set up and tear down the
- * large stack frame only in the slow case.
- */
-static __attribute__((noinline)) int _Futex_Wake_slow(
-  Futex_Control      *futex,
-  int                 count,
-  Thread_queue_Heads *heads,
-  ISR_lock_Context   *lock_context
+typedef struct {
+  Thread_queue_Context Base;
+  int                  count;
+} Futex_Context;
+
+static Thread_Control *_Futex_Flush_filter(
+  Thread_Control       *the_thread,
+  Thread_queue_Queue   *queue,
+  Thread_queue_Context *queue_context
 )
 {
-  Chain_Control  unblock;
-  Chain_Node    *node;
-  Chain_Node    *tail;
-  int            woken;
+  Futex_Context *context;
 
-  woken = 0;
-  _Chain_Initialize_empty( &unblock );
+  context = (Futex_Context *) queue_context;
 
-  while ( count > 0 && heads != NULL ) {
-    const Thread_queue_Operations *operations;
-    Thread_Control                *first;
-    bool                           do_unblock;
-
-    operations = FUTEX_TQ_OPERATIONS;
-    first = ( *operations->first )( heads );
-
-    do_unblock = _Thread_queue_Extract_locked(
-      &futex->Queue.Queue,
-      operations,
-      first
-    );
-    if (do_unblock) {
-      _Chain_Append_unprotected( &unblock, &first->Wait.Node.Chain );
-    }
-
-    ++woken;
-    --count;
-    heads = futex->Queue.Queue.heads;
+  if ( context->count <= 0 ) {
+    return NULL;
   }
 
-  node = _Chain_First( &unblock );
-  tail = _Chain_Tail( &unblock );
+  --context->count;
 
-  if ( node != tail ) {
-    Per_CPU_Control *cpu_self;
-
-    cpu_self = _Thread_Dispatch_disable_critical( lock_context );
-    _Futex_Queue_release( futex, lock_context );
-
-    do {
-      Thread_Control *thread;
-      Chain_Node     *next;
-
-      next = _Chain_Next( node );
-      thread = THREAD_CHAIN_NODE_TO_THREAD( node );
-      _Thread_Unblock( thread );
-
-      node = next;
-    } while ( node != tail );
-
-    _Thread_Dispatch_enable( cpu_self );
-  } else {
-    _Futex_Queue_release( futex, lock_context );
-  }
-
-  return woken;
+  return the_thread;
 }
 
 int _Futex_Wake( struct _Futex_Control *_futex, int count )
 {
-  Futex_Control      *futex;
-  ISR_lock_Context    lock_context;
-  Thread_queue_Heads *heads;
+  Futex_Control *futex;
+  ISR_Level      level;
+  Futex_Context  context;
 
   futex = _Futex_Get( _futex );
-  _Futex_Queue_acquire( futex, &lock_context );
+  _Thread_queue_Context_initialize( &context.Base );
+  _Thread_queue_Context_ISR_disable( &context.Base, level );
+  _Futex_Queue_acquire_critical( futex, &context.Base );
 
   /*
    * For some synchronization objects like barriers the _Futex_Wake() must be
    * called in the fast path.  Normally there are no threads on the queue, so
    * check this condition early.
    */
-  heads = futex->Queue.Queue.heads;
-  if ( __predict_true( heads == NULL ) ) {
-    _Futex_Queue_release( futex, &lock_context );
-
+  if ( RTEMS_PREDICT_TRUE( _Thread_queue_Is_empty( &futex->Queue.Queue ) ) ) {
+    _Futex_Queue_release( futex, level, &context.Base );
     return 0;
   }
 
-  return _Futex_Wake_slow( futex, count, heads, &lock_context );
+  context.count = count;
+  _Thread_queue_Context_set_ISR_level( &context.Base, level );
+  return (int) _Thread_queue_Flush_critical(
+    &futex->Queue.Queue,
+    FUTEX_TQ_OPERATIONS,
+    _Futex_Flush_filter,
+    &context.Base
+  );
 }
-
-#endif /* HAVE_STRUCT__THREAD_QUEUE_QUEUE */

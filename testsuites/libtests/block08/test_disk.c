@@ -21,8 +21,7 @@
 #include <string.h>
 #include <inttypes.h>
 
-#include "rtems/blkdev.h"
-#include "rtems/diskdevs.h"
+#include <rtems/blkdev.h>
 
 #include "bdbuf_tests.h"
 
@@ -46,21 +45,19 @@ test_disk_ioctl(rtems_disk_device *dd, uint32_t req, void *argp)
 
             r = argp;
 
-            printk("DISK_DRV: %s ",
+            printf("DISK_DRV: %s ",
                    r->req == RTEMS_BLKDEV_REQ_READ ? "R" :
                    r->req == RTEMS_BLKDEV_REQ_WRITE ? "W" : "?");
             for (i = 0, sg = r->bufs; i < r->bufnum; i++, sg++)
             {
-                printk("[%d] ", sg->block);
+                printf("[%" PRIu32 "] ", sg->block);
             }
-            printk("\n");
+            printf("\n");
             break;
         }
 
         default:
-            printk("%s() Unexpected request comes %u\n",
-                   __FUNCTION__, req);
-            return -1;
+            return rtems_blkdev_ioctl (dd, req, argp);
     }
 
     memset(&msg, 0, sizeof(msg));
@@ -107,25 +104,15 @@ test_disk_ioctl(rtems_disk_device *dd, uint32_t req, void *argp)
     return 0;
 }
 
-rtems_device_driver
-test_disk_initialize(
-    rtems_device_major_number major,
-    rtems_device_minor_number minor,
-    void *arg)
+rtems_status_code
+test_disk_initialize(void)
 {
     rtems_status_code rc;
-    dev_t             dev;
 
-    rc = rtems_disk_io_initialize();
-    if (rc != RTEMS_SUCCESSFUL)
-        return rc;
-
-    dev = rtems_filesystem_make_dev_t(major, minor);
-    rc = rtems_disk_create_phys(dev,
-                                TEST_DISK_BLOCK_SIZE, TEST_DISK_BLOCK_NUM,
-                                test_disk_ioctl,
-                                NULL,
-                                TEST_DISK_NAME);
+    rc = rtems_blkdev_create(TEST_DISK_NAME,
+                             TEST_DISK_BLOCK_SIZE, TEST_DISK_BLOCK_NUM,
+                             test_disk_ioctl,
+                             NULL);
     if (rc != RTEMS_SUCCESSFUL)
     {
         printf("Failed to create %s disk\n", TEST_DISK_NAME);
@@ -135,7 +122,7 @@ test_disk_initialize(
     rc = bdbuf_test_create_drv_rx_queue(&drvq_id);
     if (rc != RTEMS_SUCCESSFUL)
     {
-        printk("%s() Failed to create Msg Queue for RX: %u\n",
+        printf("%s() Failed to create Msg Queue for RX: %u\n",
                __FUNCTION__, rc);
         return rc;
     }
@@ -148,7 +135,6 @@ test_disk_initialize(
         return rc;
     }
 
-    printk("TEST DISK - OK\n");
+    printf("TEST DISK - OK\n");
     return RTEMS_SUCCESSFUL;
 }
-

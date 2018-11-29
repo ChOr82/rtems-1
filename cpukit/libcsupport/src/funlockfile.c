@@ -17,15 +17,16 @@
 #include "config.h"
 #endif
 
-#if defined(RTEMS_NEWLIB) && !defined(HAVE_FUNLOCKFILE) && defined(HAVE_DECL_FUNLOCKFILE)
+#if defined(RTEMS_NEWLIB) && !defined(HAVE_FUNLOCKFILE)
 
 #include <stdio.h>
 
 /**
  * This is a non-functional stub 
  */
-void funlockfile(FILE* file __attribute__((unused)))
+void funlockfile(FILE* file)
 {
+  (void) file;
 }
 
 #endif

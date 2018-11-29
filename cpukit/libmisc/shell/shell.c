@@ -74,10 +74,10 @@ static rtems_shell_env_t *rtems_shell_init_env(
     return NULL;
   if ( !shell_env_p ) {
     *shell_env = rtems_global_shell_env;
+    shell_env->taskname = NULL;
   } else {
     *shell_env = *shell_env_p;
   }
-  shell_env->taskname = NULL;
 
   return shell_env;
 }
@@ -147,6 +147,12 @@ static void rtems_shell_init_once(void)
                           "running on %m\n");
 
   rtems_shell_init_commands();
+  rtems_shell_register_monitor_commands();
+}
+
+void rtems_shell_init_environment(void)
+{
+  assert(pthread_once(&rtems_shell_once, rtems_shell_init_once) == 0);
 }
 
 /*
@@ -674,7 +680,7 @@ static rtems_task rtems_shell_task(rtems_task_argument task_argument)
   rtems_shell_main_loop( shell_env );
   if (wake_on_end != RTEMS_INVALID_ID)
     rtems_event_send (wake_on_end, RTEMS_EVENT_1);
-  rtems_task_delete( RTEMS_SELF );
+  rtems_task_exit();
 }
 
 static bool rtems_shell_init_user_env(void)
@@ -721,10 +727,7 @@ bool rtems_shell_main_loop(
   FILE              *stdinToClose = NULL;
   FILE              *stdoutToClose = NULL;
 
-  eno = pthread_once(&rtems_shell_once, rtems_shell_init_once);
-  assert(eno == 0);
-
-  rtems_shell_register_monitor_commands();
+  rtems_shell_init_environment();
 
   shell_env = rtems_shell_init_env(shell_env_arg);
   if (shell_env == NULL) {

@@ -99,20 +99,19 @@ rtems_task Init( rtems_task_argument ignored )
 
   /* Find loop overhead */
   benchmark_timer_initialize();
-  for ( count1 = 0; count1 < ( BENCHMARKS * 2 ) - 1; count1++ ); {
-     /* rtems_task_resume( Task_id[1] ); */
+  for ( count1 = 0; count1 < ( BENCHMARKS * 2 ) - 1; count1++ ) {
+     /* no statement */ ;
   }
   tloop_overhead = benchmark_timer_read();
 
   status = rtems_task_start( Task_id[0], Task01, 0 );
   directive_failed( status, "rtems_task_start of TA01");
 
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "rtems_task_delete of INIT");
+  rtems_task_exit();
 }
 
 /* configuration information */
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_TIMER_DRIVER
 #define CONFIGURE_TICKS_PER_TIMESLICE        0
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE

@@ -73,7 +73,13 @@ static int do_open(
   bool make = (oflag & O_CREAT) == O_CREAT;
   bool exclusive = (oflag & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL);
   bool truncate = (oflag & O_TRUNC) == O_TRUNC;
-  int eval_flags = RTEMS_FS_FOLLOW_LINK
+  bool open_dir;
+#ifdef O_NOFOLLOW
+  int follow = (oflag & O_NOFOLLOW) == O_NOFOLLOW ? 0 : RTEMS_FS_FOLLOW_LINK;
+#else
+  int follow = RTEMS_FS_FOLLOW_LINK;
+#endif
+  int eval_flags = follow
     | (read_access ? RTEMS_FS_PERMS_READ : 0)
     | (write_access ? RTEMS_FS_PERMS_WRITE : 0)
     | (make ? RTEMS_FS_MAKE : 0)
@@ -86,23 +92,40 @@ static int do_open(
     create_regular_file( &ctx, mode );
   }
 
-  if ( write_access ) {
+#ifdef O_DIRECTORY
+  open_dir = ( oflag & O_DIRECTORY ) == O_DIRECTORY;
+#else
+  open_dir = false;
+#endif
+
+  if ( write_access || open_dir ) {
     const rtems_filesystem_location_info_t *currentloc =
       rtems_filesystem_eval_path_get_currentloc( &ctx );
     mode_t type = rtems_filesystem_location_type( currentloc );
 
-    if ( S_ISDIR( type ) ) {
+    if ( write_access && S_ISDIR( type ) ) {
       rtems_filesystem_eval_path_error( &ctx, EISDIR );
+    }
+
+    if ( open_dir && !S_ISDIR( type ) ) {
+      rtems_filesystem_eval_path_error( &ctx, ENOTDIR );
     }
   }
 
-  iop->flags |= rtems_libio_fcntl_flags( oflag );
   rtems_filesystem_eval_path_extract_currentloc( &ctx, &iop->pathinfo );
   rtems_filesystem_eval_path_cleanup( &ctx );
+
+  _Atomic_Store_uint(
+    &iop->flags,
+    rtems_libio_fcntl_flags( oflag ),
+    ATOMIC_ORDER_RELAXED
+  );
 
   rv = (*iop->pathinfo.handlers->open_h)( iop, path, oflag, mode );
 
   if ( rv == 0 ) {
+    rtems_libio_iop_flags_set( iop, LIBIO_FLAGS_OPEN );
+
     if ( truncate ) {
       rv = ftruncate( fd, 0 );
       if ( rv != 0 ) {
@@ -161,7 +184,7 @@ int open( const char *path, int oflag, ... )
  *  This is the Newlib dependent reentrant version of open().
  */
 int _open_r(
-  struct _reent *ptr __attribute__((unused)),
+  struct _reent *ptr RTEMS_UNUSED,
   const char    *buf,
   int            oflag,
   int            mode

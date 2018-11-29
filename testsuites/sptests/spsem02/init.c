@@ -12,7 +12,7 @@
 #include "tmacros.h"
 
 /* configuration information */
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
@@ -115,8 +115,7 @@ rtems_task Init(rtems_task_argument ignored)
   status = rtems_task_start( Task_id[0], Task01, 0);
   directive_failed( status, "rtems_task_start of TA01");
 
-  status = rtems_task_delete( RTEMS_SELF);
-  directive_failed( status, "rtems_task_delete of INIT");
+  rtems_task_exit();
 }
 
 /* Task01 starts with priority 36 */
@@ -188,6 +187,5 @@ rtems_task Task03(rtems_task_argument ignored)
   printf("TA03: priority %d\n", getprio());
 
   printf("TA03: exiting\n");
-  status = rtems_task_delete( RTEMS_SELF);
-  directive_failed( status, "rtems_task_delete TA03");
+  rtems_task_exit();
 }

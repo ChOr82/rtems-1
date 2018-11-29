@@ -109,14 +109,13 @@ rtems_task Init(
   status = rtems_task_wake_after( RTEMS_YIELD_PROCESSOR );
   directive_failed( status, "wake after" );
 
-  status = rtems_task_delete( RTEMS_SELF );
-  directive_failed( status, "delete" );
+  rtems_task_exit();
 }
 
 /* configuration information */
 #define CONFIGURE_SCHEDULER_SIMPLE
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS           4
 

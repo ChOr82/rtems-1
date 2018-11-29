@@ -46,7 +46,7 @@ __RCSID("$NetBSD: verr.c,v 1.13 2005/09/13 01:44:09 christos Exp $");
 #endif
 #endif /* LIBC_SCCS and not lint */
 
-#include <err.h>
+#include "err.h"
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -58,7 +58,7 @@ __weak_alias(verr, _verr)
 #endif
 
 __dead void
-verr(jmp_buf* exit_jmp, int eval __attribute__((unused)), const char *fmt, _BSD_VA_LIST_ ap)
+verr(jmp_buf* exit_jmp, int eval RTEMS_UNUSED, const char *fmt, _BSD_VA_LIST_ ap)
 {
 	int sverrno;
 

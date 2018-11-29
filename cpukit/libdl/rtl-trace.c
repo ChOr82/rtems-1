@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "rtl-trace.h"
+#include <rtems/rtl/rtl-trace.h>
 
 #if RTEMS_RTL_TRACE
 static rtems_rtl_trace_mask rtems_rtl_trace_flags;
@@ -58,6 +58,8 @@ rtems_rtl_trace_shell_command (int argc, char *argv[])
 {
   const char* table[] =
   {
+    "detail",
+    "warning",
     "load",
     "unload",
     "section",
@@ -67,7 +69,7 @@ rtems_rtl_trace_shell_command (int argc, char *argv[])
     "load-sect",
     "allocator",
     "unresolved",
-    "detail"
+    "cache"
   };
 
   rtems_rtl_trace_mask set_value = 0;

@@ -200,13 +200,12 @@ _fat_block_read(
 }
 
 static ssize_t
- fat_block_write(
+fat_block_write(
     fat_fs_info_t                        *fs_info,
     const uint32_t                        start_blk,
     const uint32_t                        offset,
     const uint32_t                        count,
-    const void                           *buf,
-    const bool                            overwrite_block)
+    const void                           *buf)
 {
     int                 rc             = RC_OK;
     uint32_t            bytes_to_write = MIN(count, (fs_info->vol.bytes_per_block - offset));
@@ -215,8 +214,7 @@ static ssize_t
 
     if (0 < bytes_to_write)
     {
-        if (   overwrite_block
-            || (bytes_to_write == fs_info->vol.bytes_per_block))
+        if (bytes_to_write == fs_info->vol.bytes_per_block)
         {
             rc = fat_buf_access(fs_info, sec_num, FAT_OP_TYPE_GET, &blk_buf);
         }
@@ -399,7 +397,6 @@ _fat_block_release(fat_fs_info_t *fs_info)
  *     offset             - offset inside cluster 'start'
  *     count              - count of bytes to write
  *     buff               - buffer provided by user
- *     overwrite_cluster  - true if cluster can get overwritten, false if cluster content must be kept
  *
  * RETURNS:
  *     bytes written on success, or -1 if error occured
@@ -411,8 +408,7 @@ fat_cluster_write(
     const uint32_t                        start_cln,
     const uint32_t                        offset,
     const uint32_t                        count,
-    const void                           *buff,
-    const bool                            overwrite_cluster)
+    const void                           *buff)
 {
     ssize_t             rc               = RC_OK;
     uint32_t            bytes_to_write   = MIN(count, (fs_info->vol.bpc - offset));
@@ -436,8 +432,7 @@ fat_cluster_write(
           cur_blk,
           ofs_blk,
           c,
-          &buffer[bytes_written],
-          overwrite_cluster);
+          &buffer[bytes_written]);
       if (c != ret)
         rc = -1;
       else
@@ -510,6 +505,8 @@ fat_init_volume_info(fat_fs_info_t *fs_info, const char *device)
         rtems_set_errno_and_return_minus_one(ENXIO);
     }
 
+    vol->dev = stat_buf.st_rdev;
+
     /* Read boot record */
     /* FIXME: Asserts FAT_MAX_BPB_SIZE < bdbuf block size */
     sc = rtems_bdbuf_read( vol->dd, 0, &block);
@@ -571,14 +568,14 @@ fat_init_volume_info(fat_fs_info_t *fs_info, const char *device)
     for (vol->spc_log2 = 0, i = vol->spc; (i & 1) == 0;
          i >>= 1, vol->spc_log2++);
 
-    /*
-     * "bytes per cluster" value greater than 32K is invalid
-     */
-    if ((vol->bpc = vol->bps << vol->spc_log2) > MS_BYTES_PER_CLUSTER_LIMIT)
+    /* Sectors per cluster must be a power of two */
+    if (vol->spc != UINT32_C(1) << vol->spc_log2)
     {
         close(vol->fd);
         rtems_set_errno_and_return_minus_one(EINVAL);
     }
+
+    vol->bpc = ((uint32_t) vol->bps) << vol->spc_log2;
 
     for (vol->bpc_log2 = 0, i = vol->bpc; (i & 1) == 0;
          i >>= 1, vol->bpc_log2++);

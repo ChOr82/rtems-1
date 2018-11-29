@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 #if HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -9,6 +11,8 @@
 #include <sys/sysctl.h>
 #include <sys/proc.h>
 #include <sys/mbuf.h>
+
+#include <rtems/rtems_bsdnet.h>
 
 /*
  * Display MBUF statistics

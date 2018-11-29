@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 /*
  * Copyright (c) 1980, 1986, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -45,7 +47,7 @@
 #include <sys/socketvar.h>
 #include <sys/domain.h>
 #include <sys/protosw.h>
-#include <sys/ioctl.h>
+#include <sys/sockio.h>
 
 #include <net/if.h>
 #include <net/route.h>

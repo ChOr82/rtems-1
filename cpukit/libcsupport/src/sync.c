@@ -29,6 +29,7 @@ int fdatasync(int);        /* still not always prototyped */
 #include <stdio.h>
 
 #include <rtems.h>
+#include <rtems/score/thread.h>
 #include <rtems/score/percpu.h>
 
 /* XXX check standards -- Linux version appears to be void */
@@ -47,7 +48,7 @@ static void sync_wrapper(FILE *f)
 }
 
 /* iterate over all FILE *'s for this thread */
-static void sync_per_thread(Thread_Control *t)
+static bool sync_per_thread(Thread_Control *t, void *arg)
 {
    struct _reent *current_reent;
    struct _reent *this_reent;
@@ -64,6 +65,8 @@ static void sync_per_thread(Thread_Control *t)
      _fwalk (t->libc_reent, sync_wrapper);
      executing->libc_reent = current_reent;
    }
+
+   return false;
 }
 
 /*
@@ -95,5 +98,5 @@ void sync(void)
   /*
    *  Now walk all the per-thread reentrancy structures.
    */
-  rtems_iterate_over_all_threads(sync_per_thread);
+  rtems_task_iterate(sync_per_thread, NULL);
 }

@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 /*
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -39,6 +41,7 @@
 #include "opt_ipfw.h"
 
 #include <stddef.h>
+#include <inttypes.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -59,6 +62,7 @@
 #include <net/netisr.h>
 
 #include <netinet/in.h>
+#include <rtems/rtems_netinet_in.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
 #include <netinet/ip.h>
@@ -971,13 +975,14 @@ ip_dooptions(struct mbuf *m)
 			}
 
 			if (!ip_dosourceroute) {
-				char buf[4*sizeof "123"];
+				char buf0[INET_ADDRSTRLEN];
+				char buf1[INET_ADDRSTRLEN];
 
 nosourcerouting:
-				strcpy(buf, inet_ntoa(ip->ip_dst));
 				log(LOG_WARNING, 
 				    "attempted source route from %s to %s\n",
-				    inet_ntoa(ip->ip_src), buf);
+				    inet_ntoa_r(ip->ip_dst, buf0),
+				    inet_ntoa_r(ip->ip_src, buf1));
 				type = ICMP_UNREACH;
 				code = ICMP_UNREACH_SRCFAIL;
 				goto bad;

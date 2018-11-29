@@ -20,18 +20,15 @@
 #include <bsp.h>
 #include <rtems/score/thread.h>
 
-/* forward declarations to avoid warnings */
-rtems_task Init(rtems_task_argument argument);
-
-rtems_task Init(
-  rtems_task_argument ignored
-)
+static void *Init( uintptr_t ignored )
 {
   /* initialize application */
 
   /* Real application would call idle loop functionality */
 
   /* but in this case, just return and fall into a fatal error */
+
+  return NULL;
 }
 
 /* configuration information */
@@ -56,12 +53,6 @@ rtems_task Init(
 #define CONFIGURE_DISABLE_NEWLIB_REENTRANCY
 
 /*
- *  This test does not need the console driver so there is no reason
- *  to configure termios.
- */
-#define CONFIGURE_TERMIOS_DISABLED
-
-/*
  *  This test does not use any stdio.
  */
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 0
@@ -72,6 +63,16 @@ rtems_task Init(
  *  stack they want.
  */
 #define CONFIGURE_MINIMUM_TASK_STACK_SIZE 512
+
+/*
+ * Keep the interrupt/initialization stack as is.  Otherwise, the test may fail
+ * in the low level system initialization.
+ */
+#ifdef BSP_INTERRUPT_STACK_SIZE
+  #define CONFIGURE_INTERRUPT_STACK_SIZE BSP_INTERRUPT_STACK_SIZE
+#else
+  #define CONFIGURE_INTERRUPT_STACK_SIZE CPU_STACK_MINIMUM_SIZE
+#endif
 
 /*
  *  This lowers the number of priorities that this test is able to
@@ -98,7 +99,7 @@ rtems_task Init(
  *  In this application, the initialization task performs the system
  *  initialization and then transforms itself into the idle task.
  */
-#define CONFIGURE_IDLE_TASK_BODY (Thread_Entry_numeric) Init
+#define CONFIGURE_IDLE_TASK_BODY Init
 #define CONFIGURE_IDLE_TASK_INITIALIZES_APPLICATION
 
 /*

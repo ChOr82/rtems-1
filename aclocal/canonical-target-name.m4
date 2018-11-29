@@ -1,5 +1,5 @@
 dnl canonicalize target cpu
-dnl NOTE: Most rtems targets do not fullfil autoconf's
+dnl NOTE: Most rtems targets do not fulfil autoconf's
 dnl target naming conventions "processor-vendor-os"
 dnl Therefore autoconf's AC_CANONICAL_TARGET will fail for them
 dnl and we have to fix it for rtems ourselves 
@@ -12,7 +12,10 @@ case "${target}" in
   no_cpu-*rtems*)
         RTEMS_CPU=no_cpu
 	;;
-  *) 
+  riscv*-*rtems*)
+        RTEMS_CPU=riscv
+	;;
+  *)
 	RTEMS_CPU=`echo $target | sed 's%^\([[^-]]*\)-\(.*\)$%\1%'`
 	;;
 esac

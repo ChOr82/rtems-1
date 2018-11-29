@@ -50,7 +50,7 @@ rtems_task Blocker(
   puts( "Blocker - Got memory after resize" );
   case_hit = true;
 
-  (void) rtems_task_delete( RTEMS_SELF );
+  rtems_task_exit();
 }
 
 rtems_task Init(
@@ -144,7 +144,7 @@ rtems_task Init(
 
 /* configuration information */
 
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS         2

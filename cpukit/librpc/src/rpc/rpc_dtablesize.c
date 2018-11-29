@@ -1,3 +1,5 @@
+#include "rtems-rpc-config.h"
+
 /*
  * Sun RPC is a product of Sun Microsystems, Inc. and is provided for
  * unrestricted use provided that this legend is included on all tape
@@ -37,7 +39,7 @@ static char *rcsid = "$FreeBSD: src/lib/libc/rpc/rpc_dtablesize.c,v 1.10 1999/08
 #include "config.h"
 #endif
 
-#include <sys/types.h>
+#include <sys/select.h>
 #include <unistd.h>
 
 /*

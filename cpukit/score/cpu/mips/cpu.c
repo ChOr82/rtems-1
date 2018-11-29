@@ -54,6 +54,10 @@
 #include <rtems/score/isr.h>
 #include <rtems/score/wkspace.h>
 
+#if CPU_HARDWARE_FP
+Context_Control_fp _CPU_Null_fp_context;
+#endif
+
 /*
 ** Exception stack frame pointer used in cpu_asm to pass the exception stack frame
 ** address to the context switch code.
@@ -160,11 +164,6 @@ void _CPU_ISR_Set_level( uint32_t   new_level )
 #error "CPU ISR level: unknown MIPS level for SR handling"
 #endif
   mips_set_sr( sr );
-}
-
-void _CPU_Install_interrupt_stack( void )
-{
-/* we don't support this yet */
 }
 
 void _CPU_Context_Initialize(

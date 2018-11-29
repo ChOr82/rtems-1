@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-kernel-space.h>
+
 /*
  * IP multicast forwarding procedures
  *
@@ -28,7 +30,7 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/kernel.h>
-#include <sys/ioctl.h>
+#include <sys/sockio.h>
 #include <sys/syslog.h>
 #include <net/if.h>
 #include <net/route.h>

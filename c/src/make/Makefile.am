@@ -11,7 +11,6 @@ MAKE_FILES = README directory.cfg lib.cfg
 rtems_make_DATA = $(MAKE_FILES) $(GENERIC_FILES)
 
 noinst_DATA = leaf.cfg
-EXTRA_DIST = leaf.cfg
 
 rtemsdir = $(exec_prefix)
 rtems_bspdir = $(rtemsdir)/@RTEMS_BSP@
@@ -87,4 +86,3 @@ CLEANFILES += Makefile.inc
 rtems_make_compilersdir = $(rtems_makedir)/compilers
 dist_rtems_make_compilers_DATA = compilers/gcc-target-default.cfg
 
-include $(top_srcdir)/../automake/local.am

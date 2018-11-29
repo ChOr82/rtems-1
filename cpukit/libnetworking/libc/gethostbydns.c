@@ -1,3 +1,5 @@
+#include <machine/rtems-bsd-user-space.h>
+
 /*
  * ++Copyright++ 1985, 1988, 1993
  * -
@@ -73,6 +75,7 @@
 #include <strings.h>
 #endif
 #include <netdb.h>
+#include <rtems/rtems_netdb.h>
 #include <resolv.h>
 #include <ctype.h>
 #include <errno.h>
@@ -117,7 +120,6 @@ typedef union {
     char ac;
 } align;
 
-extern int h_errno;
 int _dns_ttl_;
 
 #ifdef DEBUG

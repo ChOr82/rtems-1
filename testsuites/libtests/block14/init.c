@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2012 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2012, 2018 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
- *  Obere Lagerstr. 30
+ *  Dornierstr. 4
  *  82178 Puchheim
  *  Germany
  *  <rtems@embedded-brains.de>
@@ -18,10 +18,13 @@
 
 #include "tmacros.h"
 
+#include <sys/stat.h>
+#include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <string.h>
+#include <unistd.h>
 
-#include <rtems/blkdev.h>
 #include <rtems/bdbuf.h>
 
 const char rtems_test_name[] = "BLOCK 14";
@@ -29,6 +32,8 @@ const char rtems_test_name[] = "BLOCK 14";
 #define ACTION_COUNT 7
 
 #define BLOCK_COUNT 6
+
+#define DISK_PATH "/disk"
 
 typedef struct {
   rtems_blkdev_bnum block;
@@ -109,8 +114,7 @@ static int test_disk_ioctl(rtems_disk_device *dd, uint32_t req, void *arg)
 
     rtems_blkdev_request_done(breq, sc);
   } else {
-    errno = EINVAL;
-    rv = -1;
+    rv = rtems_blkdev_ioctl(dd, req, arg);
   }
 
   return rv;
@@ -155,38 +159,38 @@ static void test_actions(rtems_disk_device *dd)
     );
   }
 
-  rtems_blkdev_print_stats(&dd->stats, rtems_printf_plugin, NULL);
+  rtems_blkdev_print_stats(&dd->stats, 0, 1, 2, &rtems_test_printer);
 }
 
 static void test(void)
 {
   rtems_status_code sc;
-  dev_t dev = 0;
   rtems_disk_device *dd;
+  int fd;
+  int rv;
 
-  sc = rtems_disk_io_initialize();
-  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
-
-  sc = rtems_disk_create_phys(
-    dev,
+  sc = rtems_blkdev_create(
+    DISK_PATH,
     1,
     BLOCK_COUNT,
     test_disk_ioctl,
-    NULL,
     NULL
   );
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-  dd = rtems_disk_obtain(dev);
-  rtems_test_assert(dd != NULL);
+  fd = open(DISK_PATH, O_RDWR);
+  rtems_test_assert(fd >= 0);
+
+  rv = rtems_disk_fd_get_disk_device(fd, &dd);
+  rtems_test_assert(rv == 0);
+
+  rv = close(fd);
+  rtems_test_assert(rv == 0);
 
   test_actions(dd);
 
-  sc = rtems_disk_release(dd);
-  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
-
-  sc = rtems_disk_delete(dev);
-  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+  rv = unlink(DISK_PATH);
+  rtems_test_assert(rv == 0);
 }
 
 static void Init(rtems_task_argument arg)
@@ -201,8 +205,10 @@ static void Init(rtems_task_argument arg)
 }
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_SIMPLE_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_LIBBLOCK
+
+#define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4
 
 #define CONFIGURE_BDBUF_BUFFER_MIN_SIZE 1
 #define CONFIGURE_BDBUF_BUFFER_MAX_SIZE 1
@@ -218,6 +224,7 @@ static void Init(rtems_task_argument arg)
 
 #define CONFIGURE_INIT_TASK_INITIAL_MODES RTEMS_DEFAULT_MODES
 #define CONFIGURE_INIT_TASK_PRIORITY 2
+#define CONFIGURE_INIT_TASK_ATTRIBUTES RTEMS_FLOATING_POINT
 
 #define CONFIGURE_INIT
 
